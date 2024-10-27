@@ -37,6 +37,7 @@
     botao_start db "Start$"
     botao_exit db "Exit$"
     string_fim db "F"
+    string_fase db "FASE - $"
 .code  
 
 ; Escreve na tela um caractere armazenado em DL     
@@ -169,16 +170,9 @@ ESC_INT16 proc
 ESCREVE_NUMERO:
     call ESC_UINT16
 
-    pop AX   
+    pop AX
     ret
 endp
-
-; Funcao destinada ao menu inicial, retorna a opcao selecionada (jogar ou sair)
-SOLICITAR_OPCAO proc
-    push ax
-    mov DH, 16
-    mov DL, 14
-    call INDICADOR_OPCAO
 
 ; Funcao para desenhar os objetos
 ; SI: Posicao desenho na memoria
@@ -309,6 +303,41 @@ DESENHA_QUADRADO_BOTAO proc
     ret
 endp
 
+;AL = char do numero da fase (ASCII)
+;BL = Cor
+INICIO_FASE proc
+    push BX
+    push DX
+    push CX
+    push AX
+
+    call LIMPAR_TELA
+    
+    ;Escreve a logo de inicio
+    mov DH, 11 ; linha
+    mov DL, 15 ; coluna
+    mov BP, offset string_fase
+    call ESC_STRING
+    
+    mov CX, 1
+    mov BH, 1
+    mov AH, 09H
+    int 10H
+        
+    mov AH, 00h
+    int 16H      ;Escreve o char do numero da fase no cursor
+    
+    call LER_KEY
+    
+    call LIMPAR_TELA
+    
+    pop AX
+    pop CX
+    pop DX
+    pop BX
+    ret
+endp
+
 TELA_INICIAL proc
 
     mov ax, memoria_video
@@ -405,10 +434,12 @@ FIM_MENU_INICIAL:
     
 CHAMA_INICIO:
     ;call INICIAR_JOGO
-    call LIMPAR_TELA
+    mov BL, 2
+    mov AL, 49
+    call INICIO_FASE
     
 FIM_TELA_INICIAL:
-    call LIMPAR_TELA
+    ;call LIMPAR_TELA
     ;call FIM_PROGRAMA
     ret
 endp
@@ -569,6 +600,7 @@ INICIO:
     
     call TELA_INICIAL
     
-    mov ah, 00h
+    
+    mov ah, 4ch
     int 21h
 end INICIO 
