@@ -183,7 +183,6 @@ SOLICITAR_OPCAO proc
 ; Funcao para desenhar os objetos
 ; SI: Posicao desenho na memoria
 ; DI: Posicao do primeiro pixel do desenho no video
-   
 DESENHA_ELEMENTO proc
     push dx
     push cx
@@ -326,31 +325,53 @@ TELA_INICIAL proc
     ;FIM
     
     ;Escreve o start de inicio com o botao
-        mov BL, 0CH   ; cor VERMELHO
-        mov DH, 16    ; linha
-        mov DL, 18    ; coluna
-        mov BP, offset botao_start
-        call ESC_STRING
-        
-        ;DEsenha o botao
-        mov CX, 7   ;Largura do botao
-        dec DH      ; linha
-        sub DL, 2   ; coluna
-        call DESENHA_QUADRADO_BOTAO
+    mov BL, 0CH   ; cor VERMELHO
+    mov DH, 16    ; linha
+    mov DL, 18    ; coluna
+    mov BP, offset botao_start
+    call ESC_STRING
+    
+    ;Desenha o botao
+    mov CX, 7   ;Largura do botao
+    dec DH      ; linha
+    sub DL, 2   ; coluna
+    call DESENHA_QUADRADO_BOTAO
     ;FIM
     
     ;Escreve o exit do inicio
-        mov BL, 15  ;cor BRANCA
-        mov DH, 19  ; linha
-        mov DL, 18  ; coluna
-        mov BP, offset botao_exit
-        call ESC_STRING
-        
-        mov CX, 7             ;Largura do botao
-        dec DH                ; linha
-        sub DL, 2             ; coluna
-        call DESENHA_QUADRADO_BOTAO
+    mov BL, 15  ;cor BRANCA
+    mov DH, 19  ; linha
+    mov DL, 18  ; coluna
+    mov BP, offset botao_exit
+    call ESC_STRING
+    
+    mov CX, 7             ;Largura do botao
+    dec DH                ; linha
+    sub DL, 2             ; coluna
+    call DESENHA_QUADRADO_BOTAO
     ;FIM
+    
+    ; SI: Posicao desenho na memoria
+    ; DI: Posicao do primeiro pixel do desenho no video 
+    mov AX,offset memoria_video 
+    mov ES, AX 
+    mov AL, 100 ;linha
+    mov BX, 320
+    mul BX
+    add AX, 10 ; coluna
+    mov DI, AX
+    mov SI, offset desenho_nave
+    call DESENHA_ELEMENTO
+    
+    ; SI: Posicao desenho na memoria
+    ; DI: Posicao do primeiro pixel do desenho no video
+    mov AL, 49 ;linha
+    mov BX, 320
+    mul BX
+    add AX, 235 ; coluna
+    mov DI, AX
+    call DESENHA_ELEMENTO
+    
     mov DH, 16
 Selecao:
     call LER_KEY
