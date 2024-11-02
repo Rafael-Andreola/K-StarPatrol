@@ -5,16 +5,26 @@
 .stack 100H   ; define uma pilha de 256 bytes (100H)
 
 .data 
+;-------------------------------------------------------------------------------------------
+    ;Constantes
+    
     ; Constantes para pular linha
     CR EQU 13
     LF EQU 10
-   
-    ;Param
+    
     memoria_video equ 0A000h
     
-    bit_alto_DelayTela equ 1Eh
-    bit_baixo_DelayTela equ 8480h
-
+    bit_alto_DelayTela equ 001Eh
+    bit_baixo_DelayTela equ 8480h                
+    
+    posicao_nave       dw       ?
+    tecla_cima                  equ 72
+    tecla_baixo                 equ 80
+    tecla_espaco                equ 32
+    limite_inferior             equ 54752 ; 320 * (200 - 29) + 32 (200 - altura do desenho + altura do terreno)
+    limite_superior             equ 6432 ; 320 * 20 + 32
+;-------------------------------------------------------------------------------------------               
+    ;Sprites
     logo_inicio db "       __ __    ______           ", CR, LF
                 db "      / // /___/ __/ /____ _____ ", CR, LF
                 db "     /    /___/\ \/ __/ _ `/ __/ ", CR, LF
@@ -24,35 +34,80 @@
                 db "        / ___/ _ `/ __/ __/ _ \/ /  ", CR, LF
                 db "       /_/   \_,_/\__/_/  \___/_/   $", CR, LF
                 
+    nave  db 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh
+          db   0,   0, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+          db 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0
+          
+    nave_inimiga  db  0,  0,  0,  0,  0,  0,  0,  0,  0,   0,  0,  0,  0,  0,  0
+                  db  0,  0,  0,  0,  0,  0,  0,  0,  0, 09h,09H,09H,09H,09H,09H
+                  db  0,  0,  0,  0,  0,  0,  0,  0,09H, 09H,  0,  0,  0,  0,  0
+                  db  0,  0,  0,09H,09H,09H,09H,09H,  0,   0,  0,  0,  0,  0,  0
+                  db 09H,09H,09H,09H,09H,09H,09H,09H,09H, 09H,09H,09H,09H,  0,  0
+                  db  0,  0,  0,09H,09H,09H,09H,09H,  0,   0,  0,  0,  0,  0,  0
+                  db  0,  0,  0,  0,  0,  0,  0,  0,09H, 09H,  0,  0,  0,  0,  0
+                  db  0,  0,  0,  0,  0,  0,  0,  0,  0, 09H,09H,09H,09H,09H,09H
+                  db  0,  0,  0,  0,  0,  0,  0,  0,  0,   0,  0,  0,  0,  0,  0
                 
+;-------------------------------------------------------------------------------------------
 ;STRINGS
     botao_start db "Start$"
     botao_exit db "Exit$"
     string_fim db "F"
     string_fase db "FASE - $"
-    
-    
+;-------------------------------------------------------------------------------------------
 .code  
 
-LIMPAR_TELA proc
-    push ax
-    push cx
+; Funcao para desenhar os objetos
+; SI: Posicao desenho na memoria
+; DI: Posicao do primeiro pixel do desenho no video
+DESENHA_ELEMENTO proc
     push dx
+    push cx
+    push di
+    push si
+    
+    mov dx, 9
+DESENHA_ELEMENTO_LOOP:
+    mov cx, 15
+    rep movsb
+    dec dx
+    add di, 305
+    cmp dx, 0
+    jnz DESENHA_ELEMENTO_LOOP
+    
+    pop si
+    pop di
+    pop cx
+    pop dx
+    ret
+endp
+
+LIMPAR_TELA proc
+    push AX
+    push CX
+    push DX
+    push DI
     
     mov ax, offset memoria_video
-    
     mov ES, AX
     
-    mov di, 0
-    mov al, 0
-    mov cx, 64000
+    mov DI, 0
+    mov AL, 0
+    mov CX, 64000
     rep stosb
     
-    pop dx
-    pop cx
-    pop ax
-    ret
+    pop DI
+    pop CX
+    pop DX
+    pop AX
     
+    ret
 endp
   
 POS_CURSOR proc
@@ -77,17 +132,16 @@ LER_KEY proc
 ; BL cor
 ; DH linha inicial
 ; DL coluna inicial
-; Largura CX  
 DESENHA_QUADRADO_BOTAO proc
     push AX    
     push BX
     push DX
-    push CX
     
     xor BH, BH
     
     ;Canto superior/esquerdo
     call POS_CURSOR
+    mov CX, 7 ;Largura
     mov AL, 218     
     mov CX, 1
     mov AH, 0AH
@@ -100,9 +154,7 @@ DESENHA_QUADRADO_BOTAO proc
     call POS_CURSOR
     mov AL, 196
     
-    pop CX
-    push CX
-    
+    mov CX, 7 ;Largura
     mov AH, 0AH
     int 10h
     ;FIM
@@ -137,10 +189,7 @@ DESENHA_QUADRADO_BOTAO proc
     int 10h
     ;FIM
     
-    pop CX
-    push CX
-    
-    inc CX
+    mov CX, 8
     
     ;Reta Inferior
     sub DL, CL
@@ -162,7 +211,6 @@ DESENHA_QUADRADO_BOTAO proc
     mov AH, 0AH
     int 10h
      
-    pop CX
     pop DX
     pop BX
     pop AX
@@ -174,10 +222,12 @@ endp
 DELAY proc
     push cx
     push dx
+    push AX
     
     mov ah, 86h
     int 15h
     
+    pop AX
     pop dx
     pop cx
     ret
@@ -199,18 +249,18 @@ INICIO_FASE proc
     mov BP, offset string_fase
     call ESC_STRING
     
+    ;Escreve o numero da fase
     mov CX, 1
     mov BH, 1
     mov AH, 09H
     int 10H
-        
-    call ESC_CHAR;Escreve o char do numero da fase no cursor
     
-    mov cx, offset bit_alto_DelayTela
-    mov dx, offset bit_baixo_DelayTela
+    ; espera um determinado tempo
+    mov CX, offset bit_alto_DelayTela
+    mov DX, offset bit_baixo_DelayTela
     call DELAY
     
-    call LIMPAR_TELA ; espera um determinado tempo
+    call LIMPAR_TELA
     
     pop AX
     pop CX
@@ -219,20 +269,17 @@ INICIO_FASE proc
     ret
 endp
 
-ESC_CHAR proc
-    push AX
+Fase_1 proc
+    
 
-    mov AH, 00h
-    int 16H     
 
-    pop AX
     ret
 endp
-
 
 TELA_INICIAL proc
 
     mov ax, memoria_video
+    mov ES, AX
     
     ;Escreve a logo de inicio
     mov BL, 2 ; cor VERDE
@@ -245,6 +292,18 @@ TELA_INICIAL proc
     xor bx, bx
     ;FIM
     
+    ; Inicia desenhando a nave na posi??o correta.
+    MOV [posicao_nave], 32032
+    MOV DI, [posicao_nave]
+    MOV SI, offset nave
+    CALL DESENHA_ELEMENTO
+    
+    ; Inicia desenhando a nave na posi??o correta.
+    ;MOV [posicao_nave], 32832
+    MOV DI, 32270
+    MOV SI, offset nave_inimiga
+    CALL DESENHA_ELEMENTO
+    
     ;Escreve o start de inicio com o botao
     mov BL, 0CH   ; cor VERMELHO
     mov DH, 16    ; linha
@@ -253,7 +312,6 @@ TELA_INICIAL proc
     call ESC_STRING
     
     ;Desenha o botao
-    mov CX, 7   ;Largura do botao
     dec DH      ; linha
     sub DL, 2   ; coluna
     call DESENHA_QUADRADO_BOTAO
@@ -266,13 +324,10 @@ TELA_INICIAL proc
     mov BP, offset botao_exit
     call ESC_STRING
     
-    mov CX, 7             ;Largura do botao
     dec DH                ; linha
     sub DL, 2             ; coluna
     call DESENHA_QUADRADO_BOTAO
-    
-    
-    
+
     mov DH, 16
 Selecao:
     call LER_KEY
@@ -309,7 +364,7 @@ CHAMA_INICIO:
     mov BL, 2
     mov AL, 49
     call INICIO_FASE
-    
+    call Fase_1
 FIM_TELA_INICIAL:
     call LIMPAR_TELA
     ;call FIM_PROGRAMA
@@ -335,7 +390,6 @@ select_exit:
         call ESC_STRING
         
         ;DEsenha o botao
-        mov CX, 7             ;Largura do botao
         dec dh                ; linha
         sub dl, 2             ; coluna
         call DESENHA_QUADRADO_BOTAO
@@ -349,7 +403,6 @@ select_exit:
         mov bp, offset botao_exit
         call ESC_STRING
         
-        mov CX, 7             ;Largura do botao
         dec dh                ; linha
         sub dl, 2             ; coluna
         call DESENHA_QUADRADO_BOTAO
@@ -365,7 +418,6 @@ select_start:
         call ESC_STRING
         
         ;DEsenha o botao
-        mov CX, 7             ;Largura do botao
         dec dh                ; linha
         sub dl, 2             ; coluna
         call DESENHA_QUADRADO_BOTAO
@@ -379,7 +431,6 @@ select_start:
         mov bp, offset botao_exit
         call ESC_STRING
         
-        mov CX, 7             ;Largura do botao
         dec dh                ; linha
         sub dl, 2             ; coluna
         call DESENHA_QUADRADO_BOTAO
