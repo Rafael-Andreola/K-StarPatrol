@@ -29,9 +29,9 @@
 .code  
 
 
-    ; Funcao para desenhar os objetos
-    ; SI: Posicao desenho na memoria
-    ; DI: Posicao do primeiro pixel do desenho no video
+; Funcao para desenhar os objetos
+; SI: Posicao desenho na memoria
+; DI: Posicao do primeiro pixel do desenho no video
 DESENHA_ELEMENTO proc
     push dx
     push cx
@@ -84,7 +84,6 @@ endp
 ; BX = 1 CIMA, BX = 0, BAIXO
 ; limite_inferior 4752 
 ; limite_superior 6432
-
 MOVER_NAVE proc 
     PUSH SI
     PUSH DI
@@ -98,16 +97,14 @@ MOVER_NAVE proc
     
     CMP BX, 1
     JZ MOVER_CIMA
-    
-    JMP MOVER_BAIXO
+    JNZ MOVER_BAIXO
     
 MOVER_BAIXO:
     ADD AX, 3200 ; Move 10 pixels para baixo (320 pixels por linha * 10 linhas)
     
     CMP AX, limite_inferior  
-    JG DEFINIR_LIMITE_INFERIOR
-    
-    JMP CONTINUAR_MOVIMENTO
+    JGE DEFINIR_LIMITE_INFERIOR
+    JL CONTINUAR_MOVIMENTO
     
 DEFINIR_LIMITE_INFERIOR:
     MOV AX, limite_inferior
@@ -118,9 +115,8 @@ MOVER_CIMA:
     SUB AX, 3200
     
     CMP AX, limite_superior
-    JL DEFINIR_LIMITE_SUPERIOR
-    
-    JMP CONTINUAR_MOVIMENTO
+    JLE DEFINIR_LIMITE_SUPERIOR
+    JG CONTINUAR_MOVIMENTO
     
 DEFINIR_LIMITE_SUPERIOR:
     MOV AX, limite_superior
@@ -131,11 +127,11 @@ CONTINUAR_MOVIMENTO:
     MOV DI, AX
     MOV SI, offset nave
     CALL DESENHA_ELEMENTO
-    MOV [posicao_nave], AX ; Salva a nova posição
+    MOV [posicao_nave], AX ; Salva a nova posi??o
     
-    POP AX
     POP SI
     POP DI
+    POP AX
     POP BX
     ret
 endp
@@ -155,7 +151,7 @@ INICIO:
     xor ax, ax
     xor bx, bx
 
-    ; Inicia desenhando a nave na posição correta.
+    ; Inicia desenhando a nave na posi??o correta.
     MOV [posicao_nave], 32032
     MOV DI, [posicao_nave]
     MOV SI, offset nave
@@ -164,11 +160,11 @@ INICIO:
     JMP LOOP_DESENHO
    
 LOOP_DESENHO:
-    ; Interrupção de input do teclado, resultado em AX
+    ; Interrup??o de input do teclado, resultado em AX
     MOV AH, 01H
     INT 16h
     
-    JZ LOOP_DESENHO ; Zero flag significa que não houve input, então só roda o loop novamente
+    JZ LOOP_DESENHO ; Zero flag significa que n?o houve input, ent?o s? roda o loop novamente
     
     ; AH = 01h verifica se tem teclas pressionadas no buffer, essa parte vai capturar qual tecla foi pressionada.
     MOV AH, 00h
