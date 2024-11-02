@@ -9,15 +9,15 @@
    
     memoria_video equ 0A000h
 
-    nave  db 0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh, 0, 0, 0, 0
-          db   0,   0, 0Fh, 0Fh, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-          db   0,   0, 0Fh, 0Fh, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-          db   0,   0, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0, 0, 0, 0, 0, 0
+    nave  db 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0
           db   0,   0, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh
-          db   0,   0, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0, 0, 0, 0, 0, 0
-          db   0,   0, 0Fh, 0Fh, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-          db   0,   0, 0Fh, 0Fh, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-          db 0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh, 0, 0, 0, 0
+          db   0,   0, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+          db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+          db 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0
           
     posicao_nave       dw       ?
     tecla_cima                  equ 72
@@ -28,22 +28,29 @@
     
 .code  
 
-
 ; Funcao para desenhar os objetos
 ; SI: Posicao desenho na memoria
 ; DI: Posicao do primeiro pixel do desenho no video
+; BX: Altura
+; AX: Largura
 DESENHA_ELEMENTO proc
     push dx
     push cx
     push di
     push si
+    push ax
+    push bx
     
-    mov dx, 9
+    mov dx, BX
 DESENHA_ELEMENTO_LOOP:
-    mov cx, 15
+    mov cx, AX
     rep movsb
     dec dx
-    add di, 305
+    
+    mov BX, 320
+    sub BX, AX
+    add di, BX
+    
     cmp dx, 0
     jnz DESENHA_ELEMENTO_LOOP
     
@@ -51,11 +58,13 @@ DESENHA_ELEMENTO_LOOP:
     pop di
     pop cx
     pop dx
+    pop ax
+    pop bx
     ret
 endp
 
 ; DI: Posi??o do primeiro pixel do desenho na tela
-APAGAR_ELEMENTO proc
+APAGAR_ELEMENTO_NAVE proc
     push dx
     push cx
     push di
@@ -65,13 +74,14 @@ APAGAR_ELEMENTO proc
     xor cx, cx
     mov al, 0h  
     mov dx, 9
-APAGAR_ELEMENTO_LOOP:
-    mov cl, 15 
+APAGAR_ELEMENTO_NAVE_LOOP:
+    
+    mov cx, 15 
     rep stosb    
     dec dx
     add di, 305
     cmp dx, 0
-    jnz APAGAR_ELEMENTO_LOOP
+    jnz APAGAR_ELEMENTO_NAVE_LOOP
 
     pop si
     pop di
@@ -91,7 +101,7 @@ MOVER_NAVE proc
     PUSH BX
     
     mov DI, [posicao_nave]
-    call APAGAR_ELEMENTO
+    call APAGAR_ELEMENTO_NAVE
     
     MOV AX, [posicao_nave]
     
@@ -103,8 +113,8 @@ MOVER_BAIXO:
     ADD AX, 3200 ; Move 10 pixels para baixo (320 pixels por linha * 10 linhas)
     
     CMP AX, limite_inferior  
-    JGE DEFINIR_LIMITE_INFERIOR
-    JL CONTINUAR_MOVIMENTO
+    JAE DEFINIR_LIMITE_INFERIOR
+    JNA CONTINUAR_MOVIMENTO
     
 DEFINIR_LIMITE_INFERIOR:
     MOV AX, limite_inferior
@@ -115,8 +125,8 @@ MOVER_CIMA:
     SUB AX, 3200
     
     CMP AX, limite_superior
-    JLE DEFINIR_LIMITE_SUPERIOR
-    JG CONTINUAR_MOVIMENTO
+    JBE DEFINIR_LIMITE_SUPERIOR
+    JNB CONTINUAR_MOVIMENTO
     
 DEFINIR_LIMITE_SUPERIOR:
     MOV AX, limite_superior
@@ -125,8 +135,12 @@ DEFINIR_LIMITE_SUPERIOR:
     
 CONTINUAR_MOVIMENTO:
     MOV DI, AX
+    PUSH AX
     MOV SI, offset nave
+    MOV BX, 9
+    MOV AX, 15
     CALL DESENHA_ELEMENTO
+    POP AX
     MOV [posicao_nave], AX ; Salva a nova posi??o
     
     POP SI
@@ -155,6 +169,8 @@ INICIO:
     MOV [posicao_nave], 32032
     MOV DI, [posicao_nave]
     MOV SI, offset nave
+    mov BX, 9
+    mov AX, 15
     CALL DESENHA_ELEMENTO
 
     JMP LOOP_DESENHO
@@ -198,5 +214,4 @@ APERTOU_CIMA:
     POP BX
     JMP LOOP_DESENHO
 
-   
 end INICIO 
