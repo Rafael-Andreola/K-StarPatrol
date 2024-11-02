@@ -9,20 +9,12 @@
     CR EQU 13
     LF EQU 10
    
+    ;Param
     memoria_video equ 0A000h
-
-;Desenhos
-    desenho_nave db 0Fh,0Fh,0Fh,0Fh,0Fh, 4 , 4 , 4 , 0 , 0
-                 db 0Fh,0Fh,0Fh,0Fh,0Fh, 0 , 0 , 0 , 0 , 0
-                 db  0 ,0Fh,0Fh,0Fh, 0 , 0 , 0 , 0 , 0 , 0
-                 db  0 , 4 ,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh, 0 , 0
-                 db  0 , 0 , 4 ,0Fh, 1 , 1 ,0Fh,0Fh,0Fh, 4
-                 db  0 , 0 , 4 ,0Fh, 1 , 1 ,0Fh,0Fh,0Fh, 4
-                 db  0 , 4 ,0Fh,0Fh,0Fh,0Fh,0Fh,0Fh, 0 , 0
-                 db  0 ,0Fh,0Fh,0Fh, 0 , 0 , 0 , 0 , 0 , 0
-                 db 0Fh,0Fh,0Fh,0Fh,0Fh, 0 , 0 , 0 , 0 , 0
-                 db 0Fh,0Fh,0Fh,0Fh,0Fh, 4 , 4 , 4 , 0 , 0
     
+    bit_alto_DelayTela equ 1Eh
+    bit_baixo_DelayTela equ 8480h
+
     logo_inicio db "       __ __    ______           ", CR, LF
                 db "      / // /___/ __/ /____ _____ ", CR, LF
                 db "     /    /___/\ \/ __/ _ `/ __/ ", CR, LF
@@ -38,21 +30,18 @@
     botao_exit db "Exit$"
     string_fim db "F"
     string_fase db "FASE - $"
+    
+    
 .code  
-
-; Escreve na tela um caractere armazenado em DL     
-ESC_CHAR proc
- push AX    ; salvar o reg AX
- mov AH, 2
- int 21H
- pop AX     ; restaurar o reg AX
- ret  
-endp
 
 LIMPAR_TELA proc
     push ax
     push cx
     push dx
+    
+    mov ax, offset memoria_video
+    
+    mov ES, AX
     
     mov di, 0
     mov al, 0
@@ -65,41 +54,7 @@ LIMPAR_TELA proc
     ret
     
 endp
-   
-; Escreve na tela um inteiro sem sinal    
-; de 16 bits armazenado no registrador AX
-ESC_UINT16 proc 
-    push AX      ; Salvar registradores utilizados na proc
-    push BX
-    push CX
-    push DX 
-       
-    mov BX, 10   ; divis?es sucessivas por 10
-    xor CX, CX   ; contador de d?gitos
-      
-LACO_DIV:
-    xor DX, DX   ; zerar DX pois o dividendo ? DXAX
-    div BX       ; divis?o para separar o d?gito em DX
-    
-    push DX      ; empilhar o d?gito
-    inc CX       ; incrementa o contador de d?gitos
-     
-    cmp AX, 0    ; AX chegou a 0?
-    jnz LACO_DIV ; enquanto AX diferente de 0 salte para LACO_DIV
-           
- LACO_ESCDIG:   
-    pop DX       ; desempilha o d?gito    
-    add DL, '0'  ; converter o d?gito para ASCII
-    call ESC_CHAR               
-    loop LACO_ESCDIG ; decrementa o contador de d?gitos
-    
-    pop DX       ; Restaurar registradores utilizados na proc
-    pop CX
-    pop BX
-    pop AX
-    ret     
-endp
-
+  
 POS_CURSOR proc
     push ax
     push bx
@@ -107,95 +62,6 @@ POS_CURSOR proc
     int 10h                      ;Interrupcao
     pop bx
     pop ax
-    ret
-endp
-
-; Funcao para trocar os [] das opcoes
-    INDICADOR_OPCAO proc
-    push DX
-    push CX
-    mov CH, DH
-    cmp DH, 18
-    jz APAGA_CIMA
-    
-    add DH, 2
-    jmp LIMPA_INDICADOR
-    
-APAGA_CIMA:                   ; apagar as [ ] da linha de cima
-    sub dh, 2
-    
-LIMPA_INDICADOR:
-    call POS_CURSOR
-    mov cl, dl
-    sub dh, 2
-    mov dl, 32
-    call ESC_CHAR
-    mov dl, 26
-    add dh, 2
-    call POS_CURSOR
-    mov dl, 32
-    call ESC_CHAR
-    
-    mov dx, cx
-    call POS_CURSOR
-    
-    mov dl, 91
-    call ESC_CHAR
-    mov dl, 26
-    call POS_CURSOR
-    mov dl, 93
-    CALL ESC_CHAR
-    
-    mov dl, 31
-    call POS_CURSOR
-    
-    pop cx
-    pop dx
-    ret
-endp 
-
-; Escreve na tela um inteiro COM sinal    
-; de 16 bits armazenado no registrador AX
-ESC_INT16 proc 
-    push AX         
-    cmp AX, 0 ; Se AX < 0, SF = 1
-    jns ESCREVE_NUMERO
-     
-    ; Escrever o sinal de menos
-    mov DL, '-'    
-    call ESC_CHAR 
-     
-    neg AX ; Inverte o sinal 
-    
-ESCREVE_NUMERO:
-    call ESC_UINT16
-
-    pop AX
-    ret
-endp
-
-; Funcao para desenhar os objetos
-; SI: Posicao desenho na memoria
-; DI: Posicao do primeiro pixel do desenho no video
-DESENHA_ELEMENTO proc
-    push dx
-    push cx
-    push di
-    push si
-    
-    mov dx, 10
-DESENHA_ELEMENTO_LOOP:
-    mov cx, 10
-    rep movsb
-    dec dx
-    add di, 310
-    cmp dx, 0
-    jnz DESENHA_ELEMENTO_LOOP
-    
-    pop si
-    pop di
-    pop cx
-    pop dx
     ret
 endp
 
@@ -303,6 +169,20 @@ DESENHA_QUADRADO_BOTAO proc
     ret
 endp
 
+;Recebe em CX parte alta em microsegundos
+;Recebe em DX parte baixa em microsegundos
+DELAY proc
+    push cx
+    push dx
+    
+    mov ah, 86h
+    int 15h
+    
+    pop dx
+    pop cx
+    ret
+endp
+
 ;AL = char do numero da fase (ASCII)
 ;BL = Cor
 INICIO_FASE proc
@@ -324,12 +204,13 @@ INICIO_FASE proc
     mov AH, 09H
     int 10H
         
-    mov AH, 00h
-    int 16H      ;Escreve o char do numero da fase no cursor
+    call ESC_CHAR;Escreve o char do numero da fase no cursor
     
-    call LER_KEY
+    mov cx, offset bit_alto_DelayTela
+    mov dx, offset bit_baixo_DelayTela
+    call DELAY
     
-    call LIMPAR_TELA
+    call LIMPAR_TELA ; espera um determinado tempo
     
     pop AX
     pop CX
@@ -337,6 +218,17 @@ INICIO_FASE proc
     pop BX
     ret
 endp
+
+ESC_CHAR proc
+    push AX
+
+    mov AH, 00h
+    int 16H     
+
+    pop AX
+    ret
+endp
+
 
 TELA_INICIAL proc
 
@@ -378,28 +270,8 @@ TELA_INICIAL proc
     dec DH                ; linha
     sub DL, 2             ; coluna
     call DESENHA_QUADRADO_BOTAO
-    ;FIM
     
-    ; SI: Posicao desenho na memoria
-    ; DI: Posicao do primeiro pixel do desenho no video 
-    mov AX,offset memoria_video 
-    mov ES, AX 
-    mov AL, 100 ;linha
-    mov BX, 320
-    mul BX
-    add AX, 10 ; coluna
-    mov DI, AX
-    mov SI, offset desenho_nave
-    call DESENHA_ELEMENTO
     
-    ; SI: Posicao desenho na memoria
-    ; DI: Posicao do primeiro pixel do desenho no video
-    mov AL, 49 ;linha
-    mov BX, 320
-    mul BX
-    add AX, 235 ; coluna
-    mov DI, AX
-    call DESENHA_ELEMENTO
     
     mov DH, 16
 Selecao:
@@ -439,7 +311,7 @@ CHAMA_INICIO:
     call INICIO_FASE
     
 FIM_TELA_INICIAL:
-    ;call LIMPAR_TELA
+    call LIMPAR_TELA
     ;call FIM_PROGRAMA
     ret
 endp
