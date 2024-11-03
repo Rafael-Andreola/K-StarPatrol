@@ -15,7 +15,9 @@
     memoria_video equ 0A000h
     
     bit_alto_DelayTela equ 001Eh
-    bit_baixo_DelayTela equ 8480h                
+    bit_baixo_DelayTela equ 8480h    
+
+    teste equ 86A0h    
     
     posicao_nave       dw       ?
     tecla_cima                  equ 72
@@ -217,6 +219,44 @@ DESENHA_QUADRADO_BOTAO proc
     ret
 endp
 
+; Funcao para mover um objeto 1px para a esqueda
+;si = Recebe posicao atual do objeto
+MOVE_OBJETO proc
+    push ax
+    push bx
+    push cx
+    push dx
+    push di
+    push si
+    
+    mov ax, memoria_video
+    mov ds, ax
+    
+    mov dx, 16
+    
+LOOP_MOVE_OBJETO:
+    mov cx, 16
+    mov di, si
+    dec di
+    rep movsb
+    add di, 304
+    add si, 304
+    dec dx
+    cmp dx, 0
+    jnz LOOP_MOVE_OBJETO
+    
+    mov ax, @data
+    mov ds, ax
+    
+    pop si
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+endp
+
 ;Recebe em CX parte alta em microsegundos
 ;Recebe em DX parte baixa em microsegundos
 DELAY proc
@@ -232,6 +272,33 @@ DELAY proc
     pop cx
     ret
 endp
+
+;animacao_tela_inicial proc
+;    push AX
+;    push BX
+;    push CX
+;    push DX
+;    
+;    ;Recebe em CX parte alta em microsegundos
+;    ;Recebe em DX parte baixa em microsegundos
+;    mov CX, 1H
+;    mov DX, offset teste
+;    call DELAY
+;    
+;    ;Inicia desenhando a nave na posi??o correta.
+;    mov SI, offset posicao_nave
+;    call MOVE_OBJETO
+;    
+;    mov ax, [si]
+;    dec ax
+;    mov [si], ax
+;    
+;    pop DX
+;    pop CX
+;    pop BX
+;    pop AX
+;    ret
+;endp
 
 ;AL = char do numero da fase (ASCII)
 ;BL = Cor
@@ -269,12 +336,19 @@ INICIO_FASE proc
     ret
 endp
 
-Fase_1 proc
+LIMPA_BUFFER_TECLADO proc
+    mov ah, 01h
+    int 16h
     
-
-
+    jz BUFFER_LIMPO
+    mov ah, 00h
+    int 16h
+    
+    jmp LIMPA_BUFFER_TECLADO
+    
+BUFFER_LIMPO:
     ret
-endp
+    endp
 
 TELA_INICIAL proc
 
@@ -290,19 +364,6 @@ TELA_INICIAL proc
    
     xor dx,dx
     xor bx, bx
-    ;FIM
-    
-    ; Inicia desenhando a nave na posi??o correta.
-    MOV [posicao_nave], 32032
-    MOV DI, [posicao_nave]
-    MOV SI, offset nave
-    CALL DESENHA_ELEMENTO
-    
-    ; Inicia desenhando a nave na posi??o correta.
-    ;MOV [posicao_nave], 32832
-    MOV DI, 32270
-    MOV SI, offset nave_inimiga
-    CALL DESENHA_ELEMENTO
     
     ;Escreve o start de inicio com o botao
     mov BL, 0CH   ; cor VERMELHO
@@ -327,19 +388,40 @@ TELA_INICIAL proc
     dec DH                ; linha
     sub DL, 2             ; coluna
     call DESENHA_QUADRADO_BOTAO
-
-    mov DH, 16
-Selecao:
-    call LER_KEY
-    cmp AH, 48H  ;comp se e seta pra cima
+    
+    ;Inicia desenhando a nave na posi??o correta.
+    MOV [posicao_nave], 32260
+    MOV DI, [posicao_nave]
+    MOV SI, offset nave
+    CALL DESENHA_ELEMENTO
+    
+LOOP_SELECAO:
+    
+    ; Interrup??o de input do teclado, resultado em AX
+    MOV AH, 01H
+    INT 16h
+    JZ LOOP_SELECAO ; Zero flag significa que n?o houve input, ent?o s? roda o loop novamente
+    
+    ;Se teve input ele passa
+    
+    ; AH = 01h verifica se tem teclas pressionadas no buffer, essa parte vai capturar qual tecla foi pressionada.
+    MOV AH, 00h
+    INT 16h
+    
+    ; Compara se o usuario apertou a down arrow ou up arrow
+    cmp AH, 48H  ;cima
     je TROCA_SELECAO
-    cmp AH, 50H  ;comp se e seta pra baixo
+    cmp AH, 50H  ;baixo
     je TROCA_SELECAO
     
     cmp AL, 0Dh ;comp se e tecla enter
     je FIM_MENU_INICIAL
-    jne Selecao
-
+    jne LOOP_SELECAO
+    ; Compara se o usuario apertou a barra de espaco
+    ;CMP AL, 32
+    ;JZ APERTOU_ESPACO
+    
+    JMP LOOP_SELECAO ; REPETE O LOOP.
 TROCA_SELECAO:
     cmp dh, 16
     jz TROCA_pra_exit
@@ -348,11 +430,11 @@ TROCA_SELECAO:
 TROCA_pra_start:
     dec dh
     call TROCA_COR_BOTOES
-    jmp Selecao
+    jmp LOOP_SELECAO
 TROCA_pra_exit:
     inc DH
     call TROCA_COR_BOTOES
-    jmp Selecao
+    jmp LOOP_SELECAO
     
 FIM_MENU_INICIAL:
     cmp DH, 16
@@ -364,14 +446,14 @@ CHAMA_INICIO:
     mov BL, 2
     mov AL, 49
     call INICIO_FASE
-    call Fase_1
+    ;call Fase_1
 FIM_TELA_INICIAL:
     call LIMPAR_TELA
     ;call FIM_PROGRAMA
     ret
 endp
 
-TROCA_COR_BOTOES:
+TROCA_COR_BOTOES proc
     push AX
     push BX
     push CX
@@ -393,9 +475,8 @@ select_exit:
         dec dh                ; linha
         sub dl, 2             ; coluna
         call DESENHA_QUADRADO_BOTAO
-    ;FIM
     
-    ;Escreve o exit do inicio
+        ;Escreve o exit do inicio
         mov BL, 15
         mov dh, 17                   ; linha
         mov dl, 18                   ; coluna
