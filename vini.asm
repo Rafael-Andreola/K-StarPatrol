@@ -3,7 +3,6 @@
 .stack 100H   ; define uma pilha de 256 bytes (100H)
 
 .data 
-    ; Constantes para pular linha
     CR EQU 13
     LF EQU 10
    
@@ -63,7 +62,7 @@ DESENHA_ELEMENTO_LOOP:
     ret
 endp
 
-; DI: Posi??o do primeiro pixel do desenho na tela
+; DI: Posicao do primeiro pixel do desenho na tela
 APAGAR_ELEMENTO_NAVE proc
     push dx
     push cx
@@ -91,65 +90,103 @@ APAGAR_ELEMENTO_NAVE_LOOP:
     ret
 endp
 
-; BX = 1 CIMA, BX = 0, BAIXO
-; limite_inferior 4752 
-; limite_superior 6432
-MOVER_NAVE proc 
-    PUSH SI
-    PUSH DI
-    PUSH AX
-    PUSH BX
+MOVE_NAVE_CIMA proc
+    push ax
+    push bx
+    push cx
+    push si
+    push di
     
-    mov DI, [posicao_nave]
-    call APAGAR_ELEMENTO_NAVE
+    mov bx, posicao_nave
     
-    MOV AX, [posicao_nave]
+    cmp bx, limite_superior
+    jbe FIM_MOVE_NAVE_CIMA
     
-    CMP BX, 1
-    JZ MOVER_CIMA
-    JNZ MOVER_BAIXO
+    mov ax, memoria_video
+    mov ds, ax
     
-MOVER_BAIXO:
-    ADD AX, 3200 ; Move 10 pixels para baixo (320 pixels por linha * 10 linhas)
+    mov dx, 15       ; Número de linhas para mover
+    mov si, bx       
+    mov di, bx       
+    sub di, 1600     ; Move 5 linha para cima
+    push di          ; Empilha poder salvar a nova posição da nave
     
-    CMP AX, limite_inferior  
-    JAE DEFINIR_LIMITE_INFERIOR
-    JNA CONTINUAR_MOVIMENTO
+MOVE_NAVE_CIMA_LOOP:
+    mov cx, 15       ; Largura
+    rep movsb        
+    dec dx           
+    add di, 305      ; Pula para a linha anterior
+    add si, 305     
+    cmp dx, 0        
+    jnz MOVE_NAVE_CIMA_LOOP
     
-DEFINIR_LIMITE_INFERIOR:
-    MOV AX, limite_inferior
+    pop di           ; Desempilha a nova posição da nave
+    mov bx, di       ; Atualiza BX com a nova posição da nave
     
-    JMP CONTINUAR_MOVIMENTO
+    mov ax, @data
+    mov ds, ax
     
-MOVER_CIMA:
-    SUB AX, 3200
-    
-    CMP AX, limite_superior
-    JBE DEFINIR_LIMITE_SUPERIOR
-    JNB CONTINUAR_MOVIMENTO
-    
-DEFINIR_LIMITE_SUPERIOR:
-    MOV AX, limite_superior
-    
-    JMP CONTINUAR_MOVIMENTO
-    
-CONTINUAR_MOVIMENTO:
-    MOV DI, AX
-    PUSH AX
-    MOV SI, offset nave
-    MOV BX, 9
-    MOV AX, 15
-    CALL DESENHA_ELEMENTO
-    POP AX
-    MOV [posicao_nave], AX ; Salva a nova posi??o
-    
-    POP SI
-    POP DI
-    POP AX
-    POP BX
+    mov posicao_nave, bx
+
+FIM_MOVE_NAVE_CIMA:
+    pop di
+    pop si
+    pop cx
+    pop bx
+    pop ax
     ret
 endp
 
+MOVE_NAVE_BAIXO proc
+    push ax
+    push bx
+    push cx
+    push si
+    push di
+    
+    mov bx, posicao_nave  ; Carrega a posição atual da nave
+    
+    cmp bx, limite_inferior  ; Verifica se a nave atingiu o limite inferior
+    jae FIM_MOVE_NAVE_BAIXO  ; Se já atingiu o limite inferior, não move a nave
+
+    mov ax, memoria_video
+    mov ds, ax
+    
+    mov dx, 15         ; Número de linhas para mover
+    mov si, bx         
+    mov di, bx         
+    add di, 1600       ; Move 5 linha para baixo
+    push di            ; Empilha para salvar a nova posição da nave
+    
+    add di, 2880       ; inicio da ultima linha da nave
+    add si, 2880
+MOVE_NAVE_BAIXO_LOOP:
+    mov cx, 15         ; Largura
+    rep movsb          
+    dec dx             
+    sub di, 335        ; Proxima linha
+    sub si, 335        
+    cmp dx, 0         
+    jnz MOVE_NAVE_BAIXO_LOOP
+
+    pop di            
+    mov bx, di         
+    
+    mov ax, @data
+    mov ds, ax
+    
+    mov posicao_nave, bx 
+
+FIM_MOVE_NAVE_BAIXO:
+    pop di
+    pop si
+    pop cx
+    pop bx
+    pop ax
+    ret
+endp
+
+    
 INICIO:   
     mov ax, @data
     mov ds, ax
@@ -201,17 +238,11 @@ LOOP_DESENHO:
     JMP LOOP_DESENHO ; REPETE O LOOP.
 
 APERTOU_BAIXO:
-    PUSH BX
-    mov BX, 0
-    CALL MOVER_NAVE
-    POP BX
+    CALL MOVE_NAVE_BAIXO
     JMP LOOP_DESENHO
 
 APERTOU_CIMA:
-    PUSH BX
-    mov BX, 1
-    CALL MOVER_NAVE
-    POP BX
+    CALL MOVE_NAVE_CIMA
     JMP LOOP_DESENHO
 
 end INICIO 
