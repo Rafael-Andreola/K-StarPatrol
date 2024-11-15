@@ -68,6 +68,52 @@
 ; Funcao para desenhar os objetos
 ; SI: Posicao desenho na memoria
 ; DI: Posicao do primeiro pixel do desenho no video
+DESENHA_NAVE proc
+    push dx
+    push cx
+    push di
+    push si
+    
+    mov dx, 9
+DESENHA_NAVE_LOOP:
+    mov cx, 15
+    
+LOOP_DESENHO:
+    
+    lodsb
+    
+    cmp AL, 0
+    jnz SET_COR
+    
+    STOSB
+CONTINUA_LOOP_DESENHO:
+    
+    loop LOOP_DESENHO
+    
+    dec dx
+    add di, 305
+    cmp dx, 0
+    jnz DESENHA_NAVE_LOOP
+    
+    jmp SAIR_PROC
+
+SET_COR:
+    mov AL, BL
+    stosb
+    jmp CONTINUA_LOOP_DESENHO
+
+SAIR_PROC:
+    pop si
+    pop di
+    pop cx
+    pop dx
+    ret
+endp
+
+; Funcao para desenhar os objetos
+; SI: Posicao desenho na memoria
+; DI: Posicao do primeiro pixel do desenho no video
+; AL = cor
 DESENHA_ELEMENTO proc
     push dx
     push cx
@@ -390,10 +436,11 @@ TELA_INICIAL proc
     call DESENHA_QUADRADO_BOTAO
     
     ;Inicia desenhando a nave na posi??o correta.
+    MOV BL, 0Eh
     MOV [posicao_nave], 32260
     MOV DI, [posicao_nave]
     MOV SI, offset nave
-    CALL DESENHA_ELEMENTO
+    CALL DESENHA_NAVE
     
 LOOP_SELECAO:
     
