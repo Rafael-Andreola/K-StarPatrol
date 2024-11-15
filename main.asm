@@ -14,8 +14,8 @@
     
     memoria_video equ 0A000h
     
-    bit_alto_DelayMovNaveTelaInicial equ 0007h
-    bit_baixo_DelayMovNaveTelaInicial equ 0A120h
+    bit_alto_DelayMovNaveTelaInicial equ 0000h
+    bit_baixo_DelayMovNaveTelaInicial equ 0C350h
     
     bit_alto_DelayTela equ 001Eh
     bit_baixo_DelayTela equ 8480h    
@@ -28,7 +28,17 @@
     tecla_espaco                equ 32
     limite_inferior             equ 54752 ; 320 * (200 - 29) + 32 (200 - altura do desenho + altura do terreno)
     limite_superior             equ 6432 ; 320 * 20 + 32
-;-------------------------------------------------------------------------------------------               
+;-------------------------------------------------------------------------------------------
+    ;MENU
+    timer_do_jogo dw 60
+    score db "00000$"
+    tempo db "60$"
+;-------------------------------------------------------------------------------------------       
+;Variaveis de jogo
+timer dw 0
+jogando dw 0 ; status do jogo (em jogo=1; menu=0)
+
+;-------------------------------------------------------------------------------------------        
     ;Sprites
     logo_inicio db "       __ __    ______           ", CR, LF
                 db "      / // /___/ __/ /____ _____ ", CR, LF
@@ -65,6 +75,8 @@
     botao_exit db "Exit$"
     string_fim db "F"
     string_fase db "FASE - $"
+    string_score db "Score: $"
+    string_tempo db "Tempo: $"
 ;-------------------------------------------------------------------------------------------
 .code  
 
@@ -139,6 +151,98 @@ DESENHA_ELEMENTO_LOOP:
     ret
 endp
 
+INICIA_HUD proc
+    
+    ;Escreve o start de inicio com o botao
+    mov BL, 15   ; branca
+    mov DH, 0    ; linha
+    mov DL, 0    ; coluna
+    mov BP, offset string_score
+    call ESC_STRING
+    
+    mov BL, 2 
+    add DL, 6    ; coluna
+    mov BP, offset score
+    call ESC_STRING
+    
+    mov BL, 15   ; branca
+    mov DH, 0    ; linha
+    mov DL, 30    ; coluna
+    mov BP, offset string_tempo
+    call ESC_STRING
+    
+    mov AX, timer_do_jogo
+    call ESC_UINT16
+    
+    mov DI, 10000
+    stosw
+    
+    ret
+endp
+
+
+; Escreve na tela um inteiro sem sinal    
+; de 16 bits armazenado no registrador AX
+ESC_UINT16 proc 
+    push AX      ; Salvar registradores utilizados na proc
+    push BX
+    push CX
+    push DX 
+       
+    mov BX, 10   ; divis?es sucessivas por 10
+    xor CX, CX   ; contador de d?gitos
+      
+LACO_DIV:
+    xor DX, DX   ; zerar DX pois o dividendo ? DXAX
+    div BX       ; divis?o para separar o d?gito em DX
+    
+    push DX      ; empilhar o d?gito
+    inc CX       ; incrementa o contador de d?gitos
+     
+    cmp AX, 0    ; AX chegou a 0?
+    jnz LACO_DIV ; enquanto AX diferente de 0 salte para LACO_DIV
+           
+ LACO_ESCDIG:   
+    pop DX       ; desempilha o d?gito    
+    add AL, '0'  ; converter o d?gito para ASCII
+    
+    mov AH, 09h
+    mov BL, 2 
+    int 10H
+    
+    loop LACO_ESCDIG    ; decrementa o contador de d?gitos
+    
+    pop DX       ; Restaurar registradores utilizados na proc
+    pop CX
+    pop BX
+    pop AX
+    ret     
+endp
+
+; Escreve na tela um caractere armazenado em DL     
+ESC_CHAR proc
+ push AX    ; salvar o reg AX
+ mov AH, 2
+ int 21H
+ pop AX     ; restaurar o reg AX
+ ret  
+endp  
+
+FASE_1 proc
+    
+    mov BL, 2
+    mov AL, 49
+    call INICIO_FASE
+    call INICIA_HUD
+    
+    ;CALL RESETA_TEMPO_DE_JOGO
+    ;
+    ;call EM_JOGO
+    
+
+    ret
+endp
+
 LIMPAR_TELA proc
     push AX
     push CX
@@ -177,7 +281,7 @@ LER_KEY proc
     mov AH, 0
     int 16h
     ret
-    endp
+endp
 
 ;Desenha quadrado
 ; BL cor
@@ -268,7 +372,7 @@ DESENHA_QUADRADO_BOTAO proc
     ret
 endp
 
-; Funcao para mover um objeto 1px para a esqueda
+;Funcao para mover um objeto 1px para a esqueda
 ;si = Recebe posicao atual do objeto
 MOVE_OBJETO proc
     push ax
@@ -331,12 +435,57 @@ animacao_tela_inicial proc
     mov cx, offset bit_alto_DelayMovNaveTelaInicial
     mov dx, offset bit_baixo_DelayMovNaveTelaInicial
     call DELAY
+    
     call MOVE_NAVE_BAIXO
     
     pop DX
     pop CX
     pop BX
     pop AX
+    ret
+endp
+
+;Funcao para reiniciar o timer do jogo
+RESETA_TEMPO_DE_JOGO proc
+    push ax
+    push bx
+    push cx
+    push dx
+    
+    ;add si, cx
+    ;mov cx, [si]
+    ;xor dx, dx
+    mov ax, timer_do_jogo
+    ;mul cx
+    mov timer, ax
+    
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+endp
+
+; Proc de LOOP do jogo em funcionamento
+EM_JOGO proc
+    mov jogando, 1
+
+FLUXO_JOGO:
+    
+    ;CALL DELAY
+    xor dx, dx
+    mov ax, timer
+    dec ax
+    mov timer, ax
+    
+    mov DI, 10000
+    
+    stosw
+    
+    ;mov bx, jogando
+    ;cmp bx, 1
+    ;je FLUXO_JOGO
+    
     ret
 endp
 
@@ -358,7 +507,7 @@ MOVE_NAVE_BAIXO proc
     mov dx, 15         ; N?mero de linhas para mover
     mov si, bx         
     mov di, bx         
-    add di, 1600       ; Move 5 linha para baixo
+    add di, 320       ; Move 5 linha para baixo
     push di            ; Empilha para salvar a nova posi??o da nave
     
     add di, 2880       ; inicio da ultima linha da nave
@@ -437,7 +586,7 @@ LIMPA_BUFFER_TECLADO proc
     
 BUFFER_LIMPO:
     ret
-    endp
+endp
 
 TELA_INICIAL proc
 
@@ -485,6 +634,7 @@ TELA_INICIAL proc
     MOV SI, offset nave
     CALL DESENHA_NAVE
     
+    mov dh, 16
 LOOP_SELECAO:
     call animacao_tela_inicial
     
@@ -501,7 +651,7 @@ LOOP_SELECAO:
     cmp AH, 50H  ;baixo
     je TROCA_SELECAO
     
-    cmp AH, 0Dh ;comp se e tecla enter
+    cmp AH, 1CH ;comp se e tecla enter
     je FIM_MENU_INICIAL
     jne LOOP_SELECAO
     
@@ -519,9 +669,7 @@ TROCA_pra_start:
 TROCA_pra_exit:
     inc DH
     call TROCA_COR_BOTOES
-    
     jmp LOOP_SELECAO
-    
 FIM_MENU_INICIAL:
     cmp DH, 16
     jz CHAMA_INICIO
@@ -529,12 +677,12 @@ FIM_MENU_INICIAL:
     
 CHAMA_INICIO:
     ;call INICIAR_JOGO
-    mov BL, 2
-    mov AL, 49
-    call INICIO_FASE
-    ;call Fase_1
+    call FASE_1
 FIM_TELA_INICIAL:
-    call LIMPAR_TELA
+    
+    mov ah, 00h
+    int 16h
+    ;call LIMPAR_TELA
     ;call FIM_PROGRAMA
     ret
 endp
@@ -689,7 +837,6 @@ INICIO:
     call INICIA_VIDEO
     
     call TELA_INICIAL
-    
     
     mov ah, 4ch
     int 21h
