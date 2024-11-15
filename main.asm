@@ -14,6 +14,9 @@
     
     memoria_video equ 0A000h
     
+    bit_alto_DelayMovNaveTelaInicial equ 0007h
+    bit_baixo_DelayMovNaveTelaInicial equ 0A120h
+    
     bit_alto_DelayTela equ 001Eh
     bit_baixo_DelayTela equ 8480h    
 
@@ -68,6 +71,7 @@
 ; Funcao para desenhar os objetos
 ; SI: Posicao desenho na memoria
 ; DI: Posicao do primeiro pixel do desenho no video
+; BL: Cor da nave
 DESENHA_NAVE proc
     push dx
     push cx
@@ -113,7 +117,6 @@ endp
 ; Funcao para desenhar os objetos
 ; SI: Posicao desenho na memoria
 ; DI: Posicao do primeiro pixel do desenho no video
-; AL = cor
 DESENHA_ELEMENTO proc
     push dx
     push cx
@@ -169,7 +172,7 @@ POS_CURSOR proc
 endp
 
 ; Ler os direcionais do teclado
-; retorna o caractere em AL
+; retorna o caractere em AH
 LER_KEY proc
     mov AH, 0
     int 16h
@@ -306,45 +309,85 @@ endp
 ;Recebe em CX parte alta em microsegundos
 ;Recebe em DX parte baixa em microsegundos
 DELAY proc
-    push cx
-    push dx
+    push CX
+    push DX
     push AX
     
-    mov ah, 86h
+    mov AH, 86h
     int 15h
     
     pop AX
-    pop dx
-    pop cx
+    pop DX
+    pop CX
     ret
 endp
 
-;animacao_tela_inicial proc
-;    push AX
-;    push BX
-;    push CX
-;    push DX
-;    
-;    ;Recebe em CX parte alta em microsegundos
-;    ;Recebe em DX parte baixa em microsegundos
-;    mov CX, 1H
-;    mov DX, offset teste
-;    call DELAY
-;    
-;    ;Inicia desenhando a nave na posi??o correta.
-;    mov SI, offset posicao_nave
-;    call MOVE_OBJETO
-;    
-;    mov ax, [si]
-;    dec ax
-;    mov [si], ax
-;    
-;    pop DX
-;    pop CX
-;    pop BX
-;    pop AX
-;    ret
-;endp
+animacao_tela_inicial proc
+    push AX
+    push BX
+    push CX
+    push DX
+    
+    mov cx, offset bit_alto_DelayMovNaveTelaInicial
+    mov dx, offset bit_baixo_DelayMovNaveTelaInicial
+    call DELAY
+    call MOVE_NAVE_BAIXO
+    
+    pop DX
+    pop CX
+    pop BX
+    pop AX
+    ret
+endp
+
+MOVE_NAVE_BAIXO proc
+    push ax
+    push bx
+    push cx
+    push si
+    push di
+    
+    mov bx, posicao_nave  ; Carrega a posi??o atual da nave
+    
+    cmp bx, limite_inferior  ; Verifica se a nave atingiu o limite inferior
+    jae FIM_MOVE_NAVE_BAIXO  ; Se j? atingiu o limite inferior, n?o move a nave
+
+    mov ax, memoria_video
+    mov ds, ax
+    
+    mov dx, 15         ; N?mero de linhas para mover
+    mov si, bx         
+    mov di, bx         
+    add di, 1600       ; Move 5 linha para baixo
+    push di            ; Empilha para salvar a nova posi??o da nave
+    
+    add di, 2880       ; inicio da ultima linha da nave
+    add si, 2880
+MOVE_NAVE_BAIXO_LOOP:
+    mov cx, 15         ; Largura
+    rep movsb          
+    dec dx             
+    sub di, 335        ; Proxima linha
+    sub si, 335        
+    cmp dx, 0         
+    jnz MOVE_NAVE_BAIXO_LOOP
+
+    pop di            
+    mov bx, di         
+    
+    mov ax, @data
+    mov ds, ax
+    
+    mov posicao_nave, bx 
+
+FIM_MOVE_NAVE_BAIXO:
+    pop di
+    pop si
+    pop cx
+    pop bx
+    pop ax
+    ret
+endp
 
 ;AL = char do numero da fase (ASCII)
 ;BL = Cor
@@ -436,24 +479,21 @@ TELA_INICIAL proc
     call DESENHA_QUADRADO_BOTAO
     
     ;Inicia desenhando a nave na posi??o correta.
-    MOV BL, 0Eh
-    MOV [posicao_nave], 32260
+    MOV BL, 0Fh
+    MOV [posicao_nave], 32000
     MOV DI, [posicao_nave]
     MOV SI, offset nave
     CALL DESENHA_NAVE
     
 LOOP_SELECAO:
+    call animacao_tela_inicial
     
-    ; Interrup??o de input do teclado, resultado em AX
-    MOV AH, 01H
-    INT 16h
-    JZ LOOP_SELECAO ; Zero flag significa que n?o houve input, ent?o s? roda o loop novamente
+    mov AH, 01H
+    int 16h
+    jz LOOP_SELECAO ; Zero flag significa que n?o houve input, ent?o s? roda o loop novamente
     
-    ;Se teve input ele passa
-    
-    ; AH = 01h verifica se tem teclas pressionadas no buffer, essa parte vai capturar qual tecla foi pressionada.
-    MOV AH, 00h
-    INT 16h
+    ;verifica se tem teclas pressionadas no buffer, essa parte vai capturar qual tecla foi pressionada.
+    call LER_KEY
     
     ; Compara se o usuario apertou a down arrow ou up arrow
     cmp AH, 48H  ;cima
@@ -461,12 +501,9 @@ LOOP_SELECAO:
     cmp AH, 50H  ;baixo
     je TROCA_SELECAO
     
-    cmp AL, 0Dh ;comp se e tecla enter
+    cmp AH, 0Dh ;comp se e tecla enter
     je FIM_MENU_INICIAL
     jne LOOP_SELECAO
-    ; Compara se o usuario apertou a barra de espaco
-    ;CMP AL, 32
-    ;JZ APERTOU_ESPACO
     
     JMP LOOP_SELECAO ; REPETE O LOOP.
 TROCA_SELECAO:
@@ -477,10 +514,12 @@ TROCA_SELECAO:
 TROCA_pra_start:
     dec dh
     call TROCA_COR_BOTOES
+    
     jmp LOOP_SELECAO
 TROCA_pra_exit:
     inc DH
     call TROCA_COR_BOTOES
+    
     jmp LOOP_SELECAO
     
 FIM_MENU_INICIAL:
