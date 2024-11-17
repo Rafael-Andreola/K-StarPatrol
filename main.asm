@@ -171,10 +171,10 @@ INICIA_HUD proc
     mov BP, offset string_tempo
     call ESC_STRING
     
-    mov AX, timer_do_jogo
+    mov AX, 60
     call ESC_UINT16
     
-    mov DI, 10000
+    ;mov DI, 10000
     stosw
     
     ret
@@ -226,14 +226,64 @@ ESC_CHAR proc
  int 21H
  pop AX     ; restaurar o reg AX
  ret  
-endp  
+endp
+
+CRIA_NAVES_INICIO proc
+    
+    mov SI, offset nave
+    
+    mov AX, 6400
+
+    ;Escreve o start de inicio com o botao
+    mov BL, 09h
+    mov DI, AX
+    call DESENHA_NAVE
+    
+    mov BL, 0Ah
+    add DI, AX
+    call DESENHA_NAVE
+    
+    mov BL, 0Ch
+    add DI, AX
+    call DESENHA_NAVE
+    
+    mov BL, 0Dh
+    add DI, AX
+    call DESENHA_NAVE
+    
+    mov BL, 0Eh
+    add DI, AX
+    call DESENHA_NAVE
+    
+    mov BL, 07h
+    add DI, AX
+    call DESENHA_NAVE
+    
+    mov BL, 05h
+    add DI, AX
+    call DESENHA_NAVE
+    
+    mov BL, 04h
+    add DI, AX
+    call DESENHA_NAVE
+    
+    ;Inicia desenhando a nave na posi??o correta.
+    MOV BL, 0Fh
+    MOV [posicao_nave], 28820
+    MOV DI, [posicao_nave]
+    CALL DESENHA_NAVE
+
+    ret
+endp
 
 FASE_1 proc
     
     mov BL, 2
     mov AL, 49
+    
     call INICIO_FASE
     call INICIA_HUD
+    call CRIA_NAVES_INICIO
     
     ;CALL RESETA_TEMPO_DE_JOGO
     ;
@@ -571,20 +621,6 @@ INICIO_FASE proc
     pop CX
     pop DX
     pop BX
-    ret
-endp
-
-LIMPA_BUFFER_TECLADO proc
-    mov ah, 01h
-    int 16h
-    
-    jz BUFFER_LIMPO
-    mov ah, 00h
-    int 16h
-    
-    jmp LIMPA_BUFFER_TECLADO
-    
-BUFFER_LIMPO:
     ret
 endp
 
