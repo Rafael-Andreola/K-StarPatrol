@@ -1,3 +1,4 @@
+
 ;4- Fa?a uma rotina que receba um valor em AX 
 ;e calcule o seu fatorial. Retorne o valor em AX.
 .model small
@@ -18,7 +19,7 @@
     bit_baixo_DelayMovNaveTelaInicial equ 0C350h
     
     bit_alto_DelayTela equ 001Eh
-    bit_baixo_DelayTela equ 8480h    
+    bit_baixo_DelayTela equ 8480h
 
     teste equ 86A0h    
     
@@ -32,7 +33,6 @@
     ;MENU
     timer_do_jogo dw 60
     score db "00000$"
-    tempo db "60$"
 ;-------------------------------------------------------------------------------------------       
 ;Variaveis de jogo
 timer dw 0
@@ -152,7 +152,6 @@ DESENHA_ELEMENTO_LOOP:
 endp
 
 INICIA_HUD proc
-    
     ;Escreve o start de inicio com o botao
     mov BL, 15   ; branca
     mov DH, 0    ; linha
@@ -167,19 +166,44 @@ INICIA_HUD proc
     
     mov BL, 15   ; branca
     mov DH, 0    ; linha
-    mov DL, 30    ; coluna
+    mov DL, 31    ; coluna
     mov BP, offset string_tempo
     call ESC_STRING
     
-    mov AX, 60
+    mov SI, offset timer
+    mov SI, timer_do_jogo
+    
+    mov AX, SI
+    
+    call MUDA_TIMER
+    
+    stosw
+    ret
+endp 
+
+;recebe em AX o tempo
+;Printa no local do tempo correto
+MUDA_TIMER proc
+    push AX      ; Salvar registradores utilizados na proc
+    push BX
+    push CX
+    push DX 
+    
+    mov DH, 0    ; linha
+    mov DL, 38    ; coluna
+    
+    call POS_CURSOR
     call ESC_UINT16
     
-    ;mov DI, 10000
-    stosw
+    mov SI, offset timer
+    mov SI, AX
     
+    pop DX
+    pop CX
+    pop BX
+    pop AX
     ret
-endp
-
+endp 
 
 ; Escreve na tela um inteiro sem sinal    
 ; de 16 bits armazenado no registrador AX
@@ -188,35 +212,54 @@ ESC_UINT16 proc
     push BX
     push CX
     push DX 
-       
-    mov BX, 10   ; divis?es sucessivas por 10
-    xor CX, CX   ; contador de d?gitos
-      
-LACO_DIV:
-    xor DX, DX   ; zerar DX pois o dividendo ? DXAX
-    div BX       ; divis?o para separar o d?gito em DX
+    ; Configurar o loop para processar cada d?gito
+    mov bx, 10      ; Divisor para separa??o dos d?gitos (divis?o por 10)
+    xor CX, CX      ; SI ser? usado para armazenar o n?mero de d?gitos (inicializa com 0)
+
+convert_loop:
+    xor dx, dx      ; Limpar o registrador DX (necess?rio para a divis?o)
+    div bx          ; Dividir AX por 10. Quociente vai para AX e resto vai para DX (d?gito)
+    push dx         ; Armazenar o d?gito no stack
+
+    inc CX          ; Contar o n?mero de d?gitos
+    cmp ax, 0     ; Verificar se ainda h? n?meros em AX
+    jnz convert_loop ; Se AX n?o for zero, continuar o loop
+
+    ; Exibir os d?gitos da pilha em ordem correta (do primeiro ao ?ltimo)
+    mov AH, 09h    ; Fun??o de exibi??o (Teletype Output) via int 10h
+    mov BL, 02h
+print_loop:
+    pop dx          ; Recuperar um d?gito da pilha
+    add dl, '0'     ; Converter o d?gito (resto) para o c?digo ASCII
+    mov AL, DL
+    int 10h        ; Chamar interrup??o para exibir o caractere com a cor configurada
     
-    push DX      ; empilhar o d?gito
-    inc CX       ; incrementa o contador de d?gitos
-     
-    cmp AX, 0    ; AX chegou a 0?
-    jnz LACO_DIV ; enquanto AX diferente de 0 salte para LACO_DIV
-           
- LACO_ESCDIG:   
-    pop DX       ; desempilha o d?gito    
-    add AL, '0'  ; converter o d?gito para ASCII
+    call LER_CORDENADA_CURSOR
     
-    mov AH, 09h
-    mov BL, 2 
-    int 10H
+    inc DL
+    call POS_CURSOR
     
-    loop LACO_ESCDIG    ; decrementa o contador de d?gitos
+    loop print_loop ; Continuar o loop at? que todos os d?gitos sejam exibidos
     
-    pop DX       ; Restaurar registradores utilizados na proc
+    pop DX
     pop CX
     pop BX
     pop AX
     ret     
+endp
+
+LER_CORDENADA_CURSOR proc
+    push AX      ; Salvar registradores utilizados na proc
+    push BX
+    push CX
+    
+    mov AH, 03h
+    int 10h    
+
+    pop CX
+    pop BX
+    pop AX
+    ret
 endp
 
 ; Escreve na tela um caractere armazenado em DL     
