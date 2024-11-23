@@ -151,37 +151,32 @@ DESENHA_ELEMENTO_LOOP:
     ret
 endp
 
-GERA_ENDERECI_ALEATORIO proc
+;RETORNA em DI o endereco novo
+GERA_ENDERECO_ALEATORIO proc
     push AX
     push BX
     push CX
     push DX
-    ; Gerar a linha aleat?ria (de 0 a 199)
-    mov ah, 2Ch         ; Fun??o para pegar o contador de tempo
-    int 21h             ; Chama a interrup??o 21h
-    mov cx, dx          ; O valor aleat?rio vai para CX
-    ;and cx, 0C7FFh      ; Limita o valor para o intervalo de 0 a 199 (200 linhas)
     
-    ; Gerar a coluna aleat?ria (de 160 a 319)
-    mov ah, 2Ch         ; Fun??o para pegar o contador de tempo novamente
-    int 21h             ; Chama a interrup??o 21h
-    mov dx, dx          ; O valor aleat?rio vai para DX
-    ;and dx, 01FFH      ; Limita o valor para o intervalo 0-511
-    ;add dx, 160         ; Desloca o valor para que ele esteja no intervalo 160-319 (colunas)
-
-    ; Agora, CX cont?m a linha aleat?ria e DX cont?m a coluna aleat?ria (160-319)
-    ; Calculando o endere?o de v?deo correspondente
-
-    ; Calcular o deslocamento inicial da linha
-    mov ax, cx          ; Linha atual
-    mov bx, 320         ; 320 pixels por linha
-    mul bx              ; AX = linha * 320 (deslocamento inicial da linha)
+    ;Gera linha retirando 20 da HUD e 20 do terreno
+    mov BX, 160
+    call GERA_NUM_ALEATORIO
+    mov BX, 320         
+    mul BX              
     
-    ; Agora, adicionar a coluna aleat?ria
-    add ax, dx          ; AX = (linha * 320) + coluna aleat?ria
-
-    ; O valor de AX agora cont?m o endere?o de mem?ria para o pixel aleat?rio
-    ; Agora vamos modificar esse valor de v?deo (exemplo com valor 0x0F
+    ;Adiciona 20 linhas para pular o HUD
+    add ax, 6400
+    
+    mov DI, AX
+    
+    ; Gerar a coluna aleat?ria ate 145 pois a nave tem 15 de largura
+    mov BX, 145
+    call GERA_NUM_ALEATORIO
+    
+    ;Soma 160 na coluna
+    add AX, 160
+    add DI, AX
+    
     pop DX
     pop CX
     pop BX
@@ -189,16 +184,24 @@ GERA_ENDERECI_ALEATORIO proc
     ret
 endp
 
+;RECEBE BX o limite
+;RETORNA valor em AX
 GERA_NUM_ALEATORIO proc
     push BX
     push CX
-    push AX
+    push DX
     
     mov ah, 2Ch         ; Fun??o para pegar o contador de tempo
     int 21h             ; Chama a interrup??o 21h
-    div DX
     
-    pop AX
+    mov AX, DX
+    xor DX, DX
+    
+    div BX
+    
+    mov AX ,DX
+    
+    pop DX
     pop CX
     pop BX
     ret
@@ -227,7 +230,6 @@ INICIA_HUD proc
     mov SI, timer_do_jogo
     
     mov AX, SI
-    
     call MUDA_TIMER
     
     stosw
@@ -244,7 +246,6 @@ MUDA_TIMER proc
     
     mov DH, 0    ; linha
     mov DL, 38    ; coluna
-    
     call POS_CURSOR
     call ESC_UINT16
     
@@ -375,16 +376,17 @@ endp
 FASE_1 proc
     
     mov BL, 2
-    mov AL, 49
-    
+    mov AL, 49 ;1 em char
     call INICIO_FASE
+    
     call INICIA_HUD
     call CRIA_NAVES_INICIO
     
+    ;call GERA_ENDERECO_ALEATORIO
+    ;mov BL, 04h
+    ;call DESENHA_NAVE
     ;CALL RESETA_TEMPO_DE_JOGO
-    ;
     ;call EM_JOGO
-    
 
     ret
 endp
@@ -442,7 +444,6 @@ DESENHA_QUADRADO_BOTAO proc
     
     ;Canto superior/esquerdo
     call POS_CURSOR
-    mov CX, 7 ;Largura
     mov AL, 218     
     mov CX, 1
     mov AH, 0AH
@@ -454,8 +455,7 @@ DESENHA_QUADRADO_BOTAO proc
     ;reta Horizontal Superior CX vezes
     call POS_CURSOR
     mov AL, 196
-    
-    mov CX, 7 ;Largura
+    mov CX, 7
     mov AH, 0AH
     int 10h
     ;FIM
@@ -694,7 +694,7 @@ INICIO_FASE proc
 
     call LIMPAR_TELA
     
-    ;Escreve a logo de inicio
+    ;Escreve a string de inicio da fase
     mov DH, 11 ; linha
     mov DL, 15 ; coluna
     mov BP, offset string_fase
@@ -844,45 +844,42 @@ select_exit:
     
         ;Escreve o exit do inicio
         mov BL, 15
-        mov dh, 17                   ; linha
-        mov dl, 18                   ; coluna
-        add dh, 2                    ; linha
+        mov dh, 19 ; linha
+        mov dl, 18 ; coluna
         mov bp, offset botao_exit
         call ESC_STRING
         
-        dec dh                ; linha
-        sub dl, 2             ; coluna
+        dec dh    ; linha
+        sub dl, 2 ; coluna
         call DESENHA_QUADRADO_BOTAO
         
         jmp SAIR
     ;FIM
 select_start:
     ;Escreve o start de inicio
-        mov bl, 15                   ; cor
-        mov dh, 16                   ; linha
-        mov dl, 18                   ; coluna
-        mov bp, offset botao_start
-        call ESC_STRING
-        
-        ;DEsenha o botao
-        dec dh                ; linha
-        sub dl, 2             ; coluna
-        call DESENHA_QUADRADO_BOTAO
-    ;FIM
+    mov bl, 15 ; cor
+    mov dh, 16 ; linha
+    mov dl, 18 ; coluna
+    mov bp, offset botao_start
+    call ESC_STRING
+    
+    ;DEsenha o botao
+    dec dh     ; linha
+    sub dl, 2  ; coluna
+    call DESENHA_QUADRADO_BOTAO
     
     ;Escreve o exit do inicio
-        mov BL, 0CH
-        mov dh, 17                   ; linha
-        mov dl, 18                   ; coluna
-        add dh, 2                    ; linha
-        mov bp, offset botao_exit
-        call ESC_STRING
-        
-        dec dh                ; linha
-        sub dl, 2             ; coluna
-        call DESENHA_QUADRADO_BOTAO
-        
-        jmp SAIR
+    mov BL, 0CH
+    mov dh, 19 ; linha
+    mov dl, 18 ; coluna
+    mov bp, offset botao_exit
+    call ESC_STRING
+    
+    dec dh ; linha
+    sub dl, 2 ; coluna
+    call DESENHA_QUADRADO_BOTAO
+    
+    jmp SAIR
 SAIR:
     pop DX 
     pop CX
