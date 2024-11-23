@@ -151,6 +151,59 @@ DESENHA_ELEMENTO_LOOP:
     ret
 endp
 
+GERA_ENDERECI_ALEATORIO proc
+    push AX
+    push BX
+    push CX
+    push DX
+    ; Gerar a linha aleat?ria (de 0 a 199)
+    mov ah, 2Ch         ; Fun??o para pegar o contador de tempo
+    int 21h             ; Chama a interrup??o 21h
+    mov cx, dx          ; O valor aleat?rio vai para CX
+    ;and cx, 0C7FFh      ; Limita o valor para o intervalo de 0 a 199 (200 linhas)
+    
+    ; Gerar a coluna aleat?ria (de 160 a 319)
+    mov ah, 2Ch         ; Fun??o para pegar o contador de tempo novamente
+    int 21h             ; Chama a interrup??o 21h
+    mov dx, dx          ; O valor aleat?rio vai para DX
+    ;and dx, 01FFH      ; Limita o valor para o intervalo 0-511
+    ;add dx, 160         ; Desloca o valor para que ele esteja no intervalo 160-319 (colunas)
+
+    ; Agora, CX cont?m a linha aleat?ria e DX cont?m a coluna aleat?ria (160-319)
+    ; Calculando o endere?o de v?deo correspondente
+
+    ; Calcular o deslocamento inicial da linha
+    mov ax, cx          ; Linha atual
+    mov bx, 320         ; 320 pixels por linha
+    mul bx              ; AX = linha * 320 (deslocamento inicial da linha)
+    
+    ; Agora, adicionar a coluna aleat?ria
+    add ax, dx          ; AX = (linha * 320) + coluna aleat?ria
+
+    ; O valor de AX agora cont?m o endere?o de mem?ria para o pixel aleat?rio
+    ; Agora vamos modificar esse valor de v?deo (exemplo com valor 0x0F
+    pop DX
+    pop CX
+    pop BX
+    pop AX
+    ret
+endp
+
+GERA_NUM_ALEATORIO proc
+    push BX
+    push CX
+    push AX
+    
+    mov ah, 2Ch         ; Fun??o para pegar o contador de tempo
+    int 21h             ; Chama a interrup??o 21h
+    div DX
+    
+    pop AX
+    pop CX
+    pop BX
+    ret
+endp
+
 INICIA_HUD proc
     ;Escreve o start de inicio com o botao
     mov BL, 15   ; branca
