@@ -22,7 +22,7 @@
     tecla_cima                  equ 72
     tecla_baixo                 equ 80
     tecla_espaco                equ 32
-    limite_inferior             equ 54740 ; 320 * (200 - 29) + 20 (200 - altura do desenho + altura do terreno)
+    limite_inferior             equ 51220 ; 320 * (200 - 9) + 20 (200 - altura do desenho (9) - altura do terreno (20) - 11 (espaço entre a nave vermelha e o terreno)) + coluna
     limite_superior             equ 6420  ; 320 * 20 + 20
     
     limite_direita              equ 32305   ; usado na tela inicial.
