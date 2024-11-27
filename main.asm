@@ -13,7 +13,7 @@
     memoria_video equ 0A000h
     
     bit_alto_DelayMovNaveTelaInicial equ 0000h
-    bit_baixo_DelayMovNaveTelaInicial equ 0C350h
+    bit_baixo_DelayMovNaveTelaInicial equ 030D4h 
     
     bit_alto_DelayTela equ 001Eh
     bit_baixo_DelayTela equ 8480h    
@@ -33,8 +33,8 @@
 ;-------------------------------------------------------------------------------------------
     ;MENU
     timer_do_jogo dw 60
+    last_rtc_timer db ?
     score db "00000$"
-    tempo db "60$"
 ;-------------------------------------------------------------------------------------------       
 ;Variaveis de jogo
 timer dw 0
@@ -143,6 +143,32 @@ FIM_DESENHA_ELEMENTO:
     pop di
     pop cx
     pop dx
+    ret
+endp
+
+;CH = hora (em formato BCD)
+;CL = minutos (em formato BCD)
+;DH = segundos (em formato BCD)
+;DL = 0 se horário padrão e 1 se DST (Daylight Saving Time)
+;CF = 0 = relógio funcionando e 1 = relógio parado
+LER_RTC proc
+    mov ah, 02h         
+    int 1Ah            
+    ret
+endp
+
+SALVAR_TEMPO_ATUAL proc
+    PUSH AX
+    PUSH DX
+    PUSH CX
+    
+    call LER_RTC
+    mov [last_rtc_timer], dh          
+    
+    POP CX
+    POP DX
+    POP AX
+    
     ret
 endp
 
@@ -336,6 +362,7 @@ CRIAR_TERRENO_LOOP:
     ret
 endp
 
+
 FASE_1 proc
     mov BL, 2
     mov AL, 49 ;1 em char
@@ -344,6 +371,11 @@ FASE_1 proc
     call INICIA_HUD
     call CRIA_NAVES_INICIO
     call CRIAR_TERRENO
+
+    ; Configura o temporizador para gerar interrupções
+    MOV [timer_do_jogo], 60
+    call SALVAR_TEMPO_ATUAL
+    
     ;call GERA_ENDERECO_ALEATORIO
     ;mov BL, 04h
     ;call DESENHA_NAVE
@@ -354,7 +386,7 @@ LOOP_FASE:
     MOV AH, 01H
     INT 16h
     
-    JZ LOOP_FASE ; Zero flag significa que n?o houve input, ent?o s? roda o loop novamente
+    JZ CONTINUA_LOOP_FASE ; Zero flag significa que n?o houve input, ent?o s? roda o loop novamente
     
     ; AH = 01h verifica se tem teclas pressionadas no buffer, essa parte vai capturar qual tecla foi pressionada.
     MOV AH, 00h
@@ -372,15 +404,30 @@ LOOP_FASE:
     ;CMP AL, 32
     ;JZ APERTOU_ESPACO
     
-    JMP LOOP_FASE ; REPETE O LOOP.
+    JMP CONTINUA_LOOP_FASE ; REPETE O LOOP.
 
+; Antes de continuar o loop, validaremos 1 segundo já se passou.
+CONTINUA_LOOP_FASE:
+    call LER_RTC
+    cmp dh, [last_rtc_timer]
+    JNE ATUALIZA_TEMPO  
+    jmp LOOP_FASE
+
+ATUALIZA_TEMPO:
+    mov AX, [timer_do_jogo]
+    dec AX
+    call MUDA_TIMER
+    call SALVAR_TEMPO_ATUAL
+    MOV [timer_do_jogo], AX
+    jmp LOOP_FASE
+    
 APERTOU_BAIXO:
     CALL MOVE_NAVE_BAIXO
-    JMP LOOP_FASE
+    JMP CONTINUA_LOOP_FASE
 
 APERTOU_CIMA:
     CALL MOVE_NAVE_CIMA
-    JMP LOOP_FASE
+    JMP CONTINUA_LOOP_FASE
 endp
 
 LIMPAR_TELA proc
@@ -675,7 +722,7 @@ MOVE_NAVE_CIMA proc
 
     
 ajusta_limite_superior:
-    mov di, [limite_superior]       
+    mov di, limite_superior      
     
 continua_move_nave_cima:
     mov [posicao_nave], di
@@ -709,7 +756,7 @@ MOVE_NAVE_BAIXO proc
     jmp continua_move_nave_baixo
     
 ajusta_limite_inferior:
-    mov di, [limite_inferior] 
+    mov di, limite_inferior
     
 continua_move_nave_baixo:
     mov [posicao_nave], di
