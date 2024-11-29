@@ -22,7 +22,7 @@
     tecla_cima                  equ 72
     tecla_baixo                 equ 80
     tecla_espaco                equ 32
-    limite_inferior             equ 51220 ; 320 * (200 - 9) + 20 (200 - altura do desenho (9) - altura do terreno (20) - 11 (espaço entre a nave vermelha e o terreno)) + coluna
+    limite_inferior             equ 51220 ; 320 * (200 - 9) + 20 (200 - altura do desenho (9) - altura do terreno (20) - 11 (espa?o entre a nave vermelha e o terreno)) + coluna
     limite_superior             equ 6420  ; 320 * 20 + 20
     
     limite_direita              equ 32305   ; usado na tela inicial.
@@ -30,6 +30,7 @@
     
     posicao_nave_inimiga dw     ?           ; Usado no menu inicial
     nave_atual_inicio db        0           ; Define qual nave sera mostrada na animacao do menu inicial, 0 = nave aliada, 1 = nave inimiga.
+    
 ;-------------------------------------------------------------------------------------------
     ;MENU
     timer_do_jogo dw 60
@@ -39,6 +40,8 @@
 ;Variaveis de jogo
 timer dw 0
 jogando dw 0 ; status do jogo (em jogo=1; menu=0)
+naves_vivas dw 8 dup(?)
+cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
 
 ;-------------------------------------------------------------------------------------------        
     ;Sprites
@@ -149,8 +152,8 @@ endp
 ;CH = hora (em formato BCD)
 ;CL = minutos (em formato BCD)
 ;DH = segundos (em formato BCD)
-;DL = 0 se horário padrão e 1 se DST (Daylight Saving Time)
-;CF = 0 = relógio funcionando e 1 = relógio parado
+;DL = 0 se hor?rio padr?o e 1 se DST (Daylight Saving Time)
+;CF = 0 = rel?gio funcionando e 1 = rel?gio parado
 LER_RTC proc
     mov ah, 02h         
     int 1Ah            
@@ -196,7 +199,6 @@ INICIA_HUD proc
     mov SI, timer_do_jogo
     
     mov AX, SI
-    
     call MUDA_TIMER
     
     stosw
@@ -290,49 +292,92 @@ ESC_CHAR proc
 endp
 
 CRIA_NAVES_INICIO proc
-    mov SI, offset nave
+    push BX
+    push DI
     
-    mov AX, 6400
-
-    ;Escreve o start de inicio com o botao
-    mov BL, 09h
-    mov DI, AX
-    call DESENHA_ELEMENTO
-    
-    mov BL, 0Ah
-    add DI, AX
-    call DESENHA_ELEMENTO
-    
-    mov BL, 0Ch
-    add DI, AX
-    call DESENHA_ELEMENTO
-    
-    mov BL, 0Dh
-    add DI, AX
-    call DESENHA_ELEMENTO
-    
-    mov BL, 0Eh
-    add DI, AX
-    call DESENHA_ELEMENTO
-    
-    mov BL, 07h
-    add DI, AX
-    call DESENHA_ELEMENTO
-    
-    mov BL, 05h
-    add DI, AX
-    call DESENHA_ELEMENTO
-    
-    mov BL, 04h
-    add DI, AX
-    call DESENHA_ELEMENTO
+    call DESENHA_NAVES_ARRAY
     
     ;Inicia desenhando a nave na posi??o correta.
     MOV BL, 0Fh
     MOV [posicao_nave], 28820
     MOV DI, [posicao_nave]
-    CALL DESENHA_ELEMENTO
+    CALL DESENHA_NAVE
 
+    pop DI
+    pop BX
+    ret
+endp
+
+INSTANCIA_NAVES_ARRAY proc
+    push AX
+    push BX
+    push CX
+    push DX
+    push BP
+    
+    mov BP, offset naves_vivas
+    
+    mov AX, 6400
+    mov CX, 8
+LOOP_POPULA_ARRAY:
+    mov [BP], AX
+    add AX, 6400
+    add BP, 2
+    loop LOOP_POPULA_ARRAY
+    
+    pop BP
+    pop DX
+    pop CX
+    pop BX
+    pop AX
+    ret
+endp
+
+DESENHA_NAVES_ARRAY proc
+    push BX
+    push CX
+    push DI
+    push SI
+    push BP
+    
+    mov BP, offset naves_vivas
+    mov SI, offset cores_naves
+    
+    mov CX, 8 ;TAMANHO DO ARRAY
+LOOP_DESENHA_ARRAY:
+    ;mov DI, AX
+    mov BX, [BP]
+    
+    cmp BX, 0
+    jz CONTROLA_LOOP     
+    
+DESENHA:
+    mov DI, BX
+    xor BX, BX
+    mov BL, [SI]
+    call DESENHA_NAVE
+CONTROLA_LOOP:
+    add BP, 2
+    inc SI
+    loop LOOP_DESENHA_ARRAY
+    
+    pop BP
+    pop SI
+    pop DI
+    pop CX
+    pop BX
+    ret
+endp
+
+;RECEBE em DI o endereco para aonde ser? printado a nave
+;RECEBE em BL a cor
+DESENHA_NAVE proc
+    push SI
+    
+    mov SI, offset nave
+    call DESENHA_ELEMENTO
+    
+    pop SI
     ret
 endp
 
@@ -369,10 +414,11 @@ FASE_1 proc
     
     call INICIO_FASE
     call INICIA_HUD
+    call INSTANCIA_NAVES_ARRAY
     call CRIA_NAVES_INICIO
     call CRIAR_TERRENO
 
-    ; Configura o temporizador para gerar interrupções
+    ; Configura o temporizador para gerar interrup??es
     MOV [timer_do_jogo], 60
     call SALVAR_TEMPO_ATUAL
     
@@ -405,8 +451,8 @@ LOOP_FASE:
     ;JZ APERTOU_ESPACO
     
     JMP CONTINUA_LOOP_FASE ; REPETE O LOOP.
-
-; Antes de continuar o loop, validaremos 1 segundo já se passou.
+    
+; Antes de continuar o loop, validaremos 1 segundo j? se passou.
 CONTINUA_LOOP_FASE:
     call LER_RTC
     cmp dh, [last_rtc_timer]
@@ -416,6 +462,10 @@ CONTINUA_LOOP_FASE:
 ATUALIZA_TEMPO:
     mov AX, [timer_do_jogo]
     dec AX
+    
+    cmp AX, 0
+    jz PASSA_FASE
+    
     call MUDA_TIMER
     call SALVAR_TEMPO_ATUAL
     MOV [timer_do_jogo], AX
@@ -428,6 +478,8 @@ APERTOU_BAIXO:
 APERTOU_CIMA:
     CALL MOVE_NAVE_CIMA
     JMP CONTINUA_LOOP_FASE
+PASSA_FASE:
+    ;call FASE_2
 endp
 
 LIMPAR_TELA proc
@@ -463,28 +515,29 @@ POS_CURSOR proc
 endp
 
 ;RETORNA em DI o endereco novo
+;descricao: Gera endereco para spawn da nave
 GERA_ENDERECO_ALEATORIO proc
     push AX
     push BX
     push CX
     push DX
     
-    ;Gera linha retirando 20 da HUD e 20 do terreno
+;Gera linha retirando 20 da HUD e 20 do terreno
     mov BX, 160
     call GERA_NUM_ALEATORIO
     mov BX, 320         
     mul BX              
     
-    ;Adiciona 20 linhas para pular o HUD
+;Adiciona 20 linhas para pular o HUD
     add ax, 6400
     
     mov DI, AX
     
-    ; Gerar a coluna aleat?ria ate 145 pois a nave tem 15 de largura
+; Gerar a coluna aleat?ria ate 145 pois a nave tem 15 de largura
     mov BX, 145
     call GERA_NUM_ALEATORIO
     
-    ;Soma 160 na coluna
+;Soma 160 na coluna
     add AX, 160
     add DI, AX
     
@@ -497,13 +550,14 @@ endp
 
 ;RECEBE BX o limite
 ;RETORNA valor em AX
+;Descricao Funcao para pegar o contador de tempo
 GERA_NUM_ALEATORIO proc
     push BX
     push CX
     push DX
     
-    mov ah, 2Ch         ; Fun??o para pegar o contador de tempo
-    int 21h             ; Chama a interrup??o 21h
+    mov ah, 2Ch 
+    int 21h
     
     mov AX, DX
     xor DX, DX
@@ -668,7 +722,7 @@ MOVE_NAVE_ESQUERDA proc
     mov AX, 15
     mov BL, 0CH   ; VERMELHO
     call DESENHA_ELEMENTO   
-
+    
     pop di
     pop si
     pop cx
@@ -1117,8 +1171,6 @@ LOOP_TAM_STRING:
 FIM_TAM_STRING:
     pop si
     pop ax
-    ret
-    endp
     ret
 endp
 
