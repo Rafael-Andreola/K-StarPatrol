@@ -4,14 +4,17 @@
 
 .data 
 ;-------------------------------------------------------------------------------------------
-    ;Constantes
+;Constantes
     
-    ; Constantes para pular linha
+; Constantes para pular linha
     CR EQU 13
     LF EQU 10
     
     memoria_video equ 0A000h
     
+    Qtd_Naves_Inimigas_Fase_1 equ 10
+    
+;CONSTANTES DE TEMPO
     bit_alto_DelayMovNaveTelaInicial equ 0000h
     bit_baixo_DelayMovNaveTelaInicial equ 030D4h 
     
@@ -31,6 +34,8 @@
     posicao_nave_inimiga dw     ?           ; Usado no menu inicial
     nave_atual_inicio db        0           ; Define qual nave sera mostrada na animacao do menu inicial, 0 = nave aliada, 1 = nave inimiga.
     
+    
+    
 ;-------------------------------------------------------------------------------------------
     ;MENU
     timer_do_jogo dw 60
@@ -42,6 +47,9 @@ timer dw 0
 jogando dw 0 ; status do jogo (em jogo=1; menu=0)
 naves_vivas dw 8 dup(?)
 cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
+
+naves_inimigas db 0
+array_naves_inimigas_fase_1 dw [Qtd_Naves_Inimigas_Fase_1] dup(0)
 
 ;-------------------------------------------------------------------------------------------        
     ;Sprites
@@ -407,6 +415,57 @@ CRIAR_TERRENO_LOOP:
     ret
 endp
 
+CRIA_NAVE_INIMIGA proc
+    push AX
+    push BX
+    push DX
+    push SI
+    push DI
+
+    mov SI, offset naves_inimigas
+    mov DX, Qtd_Naves_Inimigas_Fase_1
+    mov BP, offset array_naves_inimigas_fase_1
+    sub BP, 2
+    
+    cmp DX, [SI]
+    jz SAIR_CRIA_NAVE
+    
+LOOP_ARRAY_NAVES_INIMIGAS:
+    add BP, 2
+    mov AX, [BP] 
+    cmp AX, 0
+    jnz LOOP_ARRAY_NAVES_INIMIGAS
+    
+    call GERA_ENDERECO_ALEATORIO
+    mov [BP], DI
+    call DESENHA_NAVE_INIMIGA
+    
+    mov DX, [SI]
+    inc DX
+    mov [SI], DX
+SAIR_CRIA_NAVE:
+    pop DI
+    pop SI
+    pop DX
+    pop BX
+    pop AX
+    ret
+endp
+
+;RECEBE em DI o endereco de memoria aonde deve ir a nave
+DESENHA_NAVE_INIMIGA proc
+    push SI
+    push BX
+
+    mov SI, offset nave_inimiga
+    mov BL, 09h
+    call DESENHA_ELEMENTO
+    
+    pop BX
+    pop SI
+    ret
+endp
+
 
 FASE_1 proc
     mov BL, 2
@@ -432,6 +491,7 @@ LOOP_FASE:
     MOV AH, 01H
     INT 16h
     
+    
     JZ CONTINUA_LOOP_FASE ; Zero flag significa que n?o houve input, ent?o s? roda o loop novamente
     
     ; AH = 01h verifica se tem teclas pressionadas no buffer, essa parte vai capturar qual tecla foi pressionada.
@@ -455,6 +515,7 @@ LOOP_FASE:
 ; Antes de continuar o loop, validaremos 1 segundo j? se passou.
 CONTINUA_LOOP_FASE:
     call LER_RTC
+    
     cmp dh, [last_rtc_timer]
     JNE ATUALIZA_TEMPO  
     jmp LOOP_FASE
@@ -465,6 +526,8 @@ ATUALIZA_TEMPO:
     
     cmp AX, 0
     jz PASSA_FASE
+    
+    call CRIA_NAVE_INIMIGA
     
     call MUDA_TIMER
     call SALVAR_TEMPO_ATUAL
