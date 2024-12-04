@@ -19,7 +19,7 @@
     bit_baixo_DelayMovNaveTelaInicial equ 030D4h 
     
     bit_alto_DelayTela equ 001Eh
-    bit_baixo_DelayTela equ 8480h    
+    bit_baixo_DelayTela equ 8480h
     
     posicao_nave       dw       ?
     tecla_cima                  equ 72
@@ -415,28 +415,69 @@ CRIAR_TERRENO_LOOP:
     ret
 endp
 
+;RECEBE em DI o endereco de memoria que a nave quer ser plotada
+;RETORNA BL = 1 quando tem algo, BL = 0 quando n?o tem
+VERIFICA_SPAWN_NAVE_INIMIGA proc
+    push DI
+    push DX
+    push AX
+    push CX
+    
+    mov BL, 1
+    
+    MOV DL, 9
+    dec DI
+LOOP_REINICIA_LINHA:
+    mov CX, 15
+LOOP_VERIFICA_SPAWN_LINHA:
+    inc DI
+    mov AX, [DI]
+    cmp AX, 0h
+    jnz RET_VERIFICA_SPAWN_NAVE_INIMIGA
+    
+    loop LOOP_VERIFICA_SPAWN_LINHA
+    
+    add DI, 305
+    
+    dec DL
+    cmp DL, 0 
+    jnz LOOP_REINICIA_LINHA
+    
+    dec BL
+RET_VERIFICA_SPAWN_NAVE_INIMIGA:
+    pop CX
+    pop AX
+    pop DX
+    pop DI
+    ret
+endp
+
 CRIA_NAVE_INIMIGA proc
     push AX
     push BX
     push DX
     push SI
     push DI
-
+    
     mov SI, offset naves_inimigas
     mov DX, Qtd_Naves_Inimigas_Fase_1
-    mov BP, offset array_naves_inimigas_fase_1
-    sub BP, 2
-    
     cmp DX, [SI]
     jz SAIR_CRIA_NAVE
     
+    mov BP, offset array_naves_inimigas_fase_1
+    sub BP, 2
 LOOP_ARRAY_NAVES_INIMIGAS:
     add BP, 2
     mov AX, [BP] 
     cmp AX, 0
     jnz LOOP_ARRAY_NAVES_INIMIGAS
-    
+LOOP_GERA_ENDERECO_ALEATORIO:
     call GERA_ENDERECO_ALEATORIO
+    
+    call VERIFICA_SPAWN_NAVE_INIMIGA
+    cmp BL, 0
+    jnz SAIR_CRIA_NAVE
+    
     mov [BP], DI
     call DESENHA_NAVE_INIMIGA
     
@@ -490,7 +531,6 @@ LOOP_FASE:
     ; Interrupcao de input do teclado, resultado em AX
     MOV AH, 01H
     INT 16h
-    
     
     JZ CONTINUA_LOOP_FASE ; Zero flag significa que n?o houve input, ent?o s? roda o loop novamente
     
