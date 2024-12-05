@@ -53,14 +53,14 @@ array_naves_inimigas_fase_1 dw [Qtd_Naves_Inimigas_Fase_1] dup(0)
 
 ;-------------------------------------------------------------------------------------------        
     ;Sprites
-    logo_inicio db "       __ __    ______           ", CR, LF
-                db "      / // /___/ __/ /____ _____ ", CR, LF
-                db "     /    /___/\ \/ __/ _ `/ __/ ", CR, LF
-                db "    /_/\_\   /___/\__/\_,_/_/    ", CR, LF
-                db "          ___       __           __ ", CR, LF
-                db "         / _ \___ _/ /________  / / ", CR, LF
-                db "        / ___/ _ `/ __/ __/ _ \/ /  ", CR, LF
-                db "       /_/   \_,_/\__/_/  \___/_/   $", CR, LF
+    logo_inicio db "       _ _    __           ", CR, LF
+                db "      / // /_/ _/ /_ ___ ", CR, LF
+                db "     /    /_/\ \/ _/ _ `/ _/ ", CR, LF
+                db "    //\\   /_/\_/\,//    ", CR, LF
+                db "          _       _           _ ", CR, LF
+                db "         / _ \_ / /___  / / ", CR, LF
+                db "        / _/ _ `/ _/ _/ _ \/ /  ", CR, LF
+                db "       //   \,/\//  \_/_/   $", CR, LF
                 
     nave  db 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0
           db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
@@ -108,7 +108,7 @@ array_naves_inimigas_fase_1 dw [Qtd_Naves_Inimigas_Fase_1] dup(0)
     botao_start db "Start$"
     botao_exit db "Exit$"
     string_fim db "F"
-    string_fase db "FASE - $"
+    string_fase db "SETOR - $"
     string_score db "Score: $"
     string_tempo db "Tempo: $"
 ;-------------------------------------------------------------------------------------------
@@ -213,6 +213,24 @@ INICIA_HUD proc
     ret
 endp 
 
+LIMPA_TIMER proc
+    push AX
+    push CX
+    PUSH DX
+    
+    call POS_CURSOR
+    MOV BL, 0
+    mov AH, 09h
+    mov cx, 2
+    mov AL, 32
+    INT 10H
+    
+    POP DX
+    pop CX
+    pop AX
+    ret
+    endp
+
 ;recebe em AX o tempo
 ;Printa no local do tempo correto
 MUDA_TIMER proc
@@ -223,6 +241,8 @@ MUDA_TIMER proc
     
     mov DH, 0    ; linha
     mov DL, 38    ; coluna
+    
+    CALL LIMPA_TIMER
     
     call POS_CURSOR
     call ESC_UINT16
@@ -1301,4 +1321,4 @@ INICIO:
     
     mov ah, 4ch
     int 21h
-end INICIO 
+end INICIO
