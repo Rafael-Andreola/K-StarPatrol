@@ -43,11 +43,11 @@
 ;-------------------------------------------------------------------------------------------       
     ;Variaveis de jogo
     jogando dw 0 ; status do jogo (em jogo=1; menu=0)
-    naves_vivas dw 8 dup(?)
-    cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
-
     naves_inimigas_na_fase db 0
     limite_naves_inimigas db 2
+    
+    array_cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
+    array_naves_vivas dw 8 dup(?)
     array_naves_inimigas dw [limite_array_naves] dup(0)
     array_cores_fases db 2, 3, 4
 ;-------------------------------------------------------------------------------------------        
@@ -349,19 +349,19 @@ INSTANCIA_NAVES_ARRAY proc
     push BX
     push CX
     push DX
-    push BP
+    push SI
     
-    mov BP, offset naves_vivas
+    mov SI, offset array_naves_vivas
     
     mov AX, 6400
     mov CX, 8
 LOOP_POPULA_ARRAY:
-    mov [BP], AX
+    mov [SI], AX
     add AX, 6400
-    add BP, 2
+    add SI, 2
     loop LOOP_POPULA_ARRAY
     
-    pop BP
+    pop SI
     pop DX
     pop CX
     pop BX
@@ -376,8 +376,8 @@ DESENHA_NAVES_ARRAY proc
     push SI
     push BP
     
-    mov BP, offset naves_vivas
-    mov SI, offset cores_naves
+    mov BP, offset array_naves_vivas
+    mov SI, offset array_cores_naves
     
     mov CX, 8 ;TAMANHO DO ARRAY
 LOOP_DESENHA_ARRAY:
@@ -1022,17 +1022,7 @@ endp
 
 ;Funcao para reiniciar o timer do jogo
 RESETA_TEMPO_DE_JOGO proc
-    push ax
-    push bx
-    push cx
-    push dx
-    
     mov [timer_do_jogo], Tempo_das_fases
-    
-    pop dx
-    pop cx
-    pop bx
-    pop ax
     ret
 endp
 
@@ -1198,7 +1188,7 @@ LOOP_DE_FASES:
     
     call SALVAR_TEMPO_ATUAL
     call FLUXO_JOGO
-    call AUMENTA_PROGRESSAO
+    call PROGRESSAO
     
     loop LOOP_DE_FASES
     
@@ -1236,16 +1226,15 @@ LOOP_RESETA_ARRAY_NAVES:
     ret
 endp
 
-AUMENTA_PROGRESSAO:
+PROGRESSAO proc
     push SI
-    push CX
+    push AX
     
-    ;mov SI, offset Fator_de_progressao_fase
-    ;mov CX, [SI]
-    ;mov SI, offset limite_naves_inimigas
-    ;add [SI], CX
+    mov AX, Fator_de_progressao_fase
+    mov SI, offset limite_naves_inimigas
+    add [SI], AX
     
-    pop CX
+    pop AX
     pop SI
     ret
 endp
