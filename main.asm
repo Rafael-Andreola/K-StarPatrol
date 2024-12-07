@@ -5,27 +5,26 @@
 .data 
 ;-------------------------------------------------------------------------------------------
 ;Constantes
-    CR                       equ 13
-    LF                       equ 10
-    tecla_cima               equ 72
-    tecla_baixo              equ 80
-    tecla_espaco             equ 32
-    limite_array_naves       equ 20
+    
+; Constantes para pular linha
+    CR           EQU 13
+    LF           EQU 10
+    tecla_cima   equ 72
+    tecla_baixo  equ 80
+    tecla_espaco equ 32
+    memoria_video equ 0A000h
+    
     Fator_de_progressao_fase equ 5
-    Qtd_fases                equ 3
-    Tempo_das_fases          equ 5
-    Ponto_por_nave_viva      equ 100
     
-    memoria_video      equ 0A000h
-    
+    Qtd_fases equ 3
+    Tempo_das_fases equ 60
 ;CONSTANTES DE TEMPO
     bit_alto_DelayMovNaveTelaInicial equ 0000h
     bit_baixo_DelayMovNaveTelaInicial equ 030D4h 
     
     bit_alto_DelayTela equ 001Eh
     bit_baixo_DelayTela equ 8480h
-
-;CONSTANTES DE TEMPO   
+    
     posicao_nave       dw       ?
 
     limite_inferior             equ 51220 ; 320 * (200 - 9) + 20 (200 - altura do desenho (9) - altura do terreno (20) - 11 (espa?o entre a nave vermelha e o terreno)) + coluna
@@ -42,16 +41,17 @@
     last_rtc_timer db ?
     score db "00000$"
 ;-------------------------------------------------------------------------------------------       
-    ;Variaveis de jogo
-    jogando db 0 ; status do jogo (em jogo=1; menu=0)
-    naves_inimigas_na_fase db 0
-    limite_naves_inimigas db 2
-    score_num dw 0
-    
-    array_cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
-    array_naves_vivas dw 8 dup(0)
-    array_naves_inimigas dw [limite_array_naves] dup(0)
-    array_cores_fases db 2, 3, 4
+;Variaveis de jogo
+timer dw 0
+jogando dw 0 ; status do jogo (em jogo=1; menu=0)
+array_naves_vivas dw 8 dup(?)
+array_cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
+
+naves_inimigas_na_fase db 0
+limite_naves_inimigas db 10
+array_naves_inimigas dw 20 dup(0)
+array_cores_fases db 2, 3, 4
+
 ;-------------------------------------------------------------------------------------------        
     ;Sprites
     logo_inicio db "       __ __    ______           ", CR, LF
@@ -102,22 +102,7 @@
             db 97 dup(06H),  25 dup(0BH),  358 dup(06H) 
             db 99 dup(06H),  22 dup(0BH),  359 dup(06H) 
             db 100 dup(06H),  20 dup(0BH),  360 dup(06H) 
-            db 105 dup(06H),  12 dup(0BH),  363 dup(06H)
-            
-    ascii_fim_de_jogo db "                                    ", CR, LF
-                      db "    _____ _  _        ____  _____   ", CR, LF
-                      db "   /    // \/ \__/|  /  _ \/  __/   ", CR, LF
-                      db "   |  __\| || |\/||  | | \||  \     ", CR, LF
-                      db "   | |   | || |  ||  | |_/||  /_    ", CR, LF
-                      db "   \_/   \_/\_/  \|  \____/\____\   ", CR, LF
-                      db "                                    ", CR, LF
-                      db "       _  ____  _____ ____          ", CR, LF
-                      db "      / |/  _ \/  __//  _ \         ", CR, LF
-                      db "      | || / \|| |  _| / \|         ", CR, LF
-                      db "   /\_| || \_/|| |_//| \_/|         ", CR, LF
-                      db "   \____/\____/\____\\____/         ", CR, LF
-                      db "                                    $", CR, LF
-
+            db 105 dup(06H),  12 dup(0BH),  363 dup(06H) 
                 
 ;-------------------------------------------------------------------------------------------
 ;STRINGS
@@ -135,12 +120,12 @@
 ; DI: Posicao do primeiro pixel do desenho no video
 ; BL: Cor da nave
 DESENHA_ELEMENTO proc
-    push AX
-    push BX
     push dx
     push cx
     push di
     push si
+    push BX
+    push AX
     
     mov dx, 9
 DESENHA_ELEMENTO_LOOP:
@@ -168,12 +153,12 @@ SET_COR:
     jmp CONTINUA_LOOP_DESENHO
 
 FIM_DESENHA_ELEMENTO:
+    pop AX
+    pop BX
     pop si
     pop di
     pop cx
     pop dx
-    pop BX
-    pop AX
     ret
 endp
 
@@ -227,6 +212,7 @@ INICIA_HUD proc
     mov BP, offset string_tempo
     call ESC_STRING
     
+    mov SI, offset timer
     mov SI, timer_do_jogo
     
     mov AX, SI
@@ -274,8 +260,8 @@ MUDA_TIMER proc
     call POS_CURSOR
     call ESC_UINT16
     
-    ;mov SI, offset timer
-    ;mov SI, AX
+    mov SI, offset timer
+    mov SI, AX
     
     pop DX
     pop CX
@@ -370,19 +356,19 @@ INSTANCIA_NAVES_ARRAY proc
     push BX
     push CX
     push DX
-    push SI
+    push BP
     
-    mov SI, offset array_naves_vivas
+    mov BP, offset array_naves_vivas
     
     mov AX, 6400
     mov CX, 8
 LOOP_POPULA_ARRAY:
-    mov [SI], AX
+    mov [BP], AX
     add AX, 6400
-    add SI, 2
+    add BP, 2
     loop LOOP_POPULA_ARRAY
     
-    pop SI
+    pop BP
     pop DX
     pop CX
     pop BX
@@ -393,34 +379,34 @@ endp
 DESENHA_NAVES_ARRAY proc
     push BX
     push CX
-    push AX
     push DI
     push SI
+    push BP
     
-    mov SI, offset array_naves_vivas
-    xor AX, AX
-    xor BX, BX
+    mov BP, offset array_naves_vivas
+    mov SI, offset array_cores_naves
     
-    mov CX, 8
+    mov CX, 8 ;TAMANHO DO ARRAY
 LOOP_DESENHA_ARRAY:
-    cmp word ptr [SI], 0
+    ;mov DI, AX
+    mov BX, [BP]
+    
+    cmp BX, 0
     jz CONTROLA_LOOP     
     
 DESENHA:
-    mov DI, offset array_cores_naves
-    add DI, AX
-    
-    mov BL, [DI]
-    mov DI, [SI]
+    mov DI, BX
+    xor BX, BX
+    mov BL, [SI]
     call DESENHA_NAVE
 CONTROLA_LOOP:
-    add SI, 2
-    inc AL
+    add BP, 2
+    inc SI
     loop LOOP_DESENHA_ARRAY
-
+    
+    pop BP
     pop SI
     pop DI
-    pop AX
     pop CX
     pop BX
     ret
@@ -542,7 +528,8 @@ GET_ARRAY_NAVES_INIMIGAS proc
     push CX
     push AX
     
-    mov CX, limite_array_naves
+    mov CX, 20
+    
     mov SI, offset array_naves_inimigas
 LOOP_GET_NAVES:
     xor AX, AX
@@ -626,6 +613,7 @@ ATUALIZA_TEMPO:
     cmp AX, 0
     jz SAIR_FLUXO_JOGO
     
+    call MOVIMENTAR_NAVES_INIMIGAS
     call CRIA_NAVE_INIMIGA
     
     call MUDA_TIMER
@@ -676,6 +664,38 @@ POS_CURSOR proc
     int 10h   ;Interrupcao
     pop bx
     pop ax
+    ret
+endp
+
+MOVIMENTAR_NAVES_INIMIGAS proc
+    PUSH SI
+    PUSH DI
+    PUSH CX
+
+    CMP [naves_inimigas_na_fase], 0                       
+    JZ SAIR_MOVIMENTAR_NAVES         
+    
+    XOR CX, CX
+    MOV CL, [limite_naves_inimigas]          
+    mov SI, offset array_naves_inimigas 
+ITERAR_NAVES:
+    mov DI, [SI]                        
+
+    CMP DI, 0 
+    JZ PROXIMA_ITERACAO
+    
+    CALL MOVE_NAVE_ESQUERDA
+    MOV [SI], DI
+
+PROXIMA_ITERACAO:
+    ADD SI, 2
+    loop ITERAR_NAVES                   
+
+SAIR_MOVIMENTAR_NAVES:
+    POP CX
+    POP DI
+    POP SI
+
     ret
 endp
 
@@ -860,38 +880,196 @@ APAGAR_ELEMENTO_LOOP:
     cmp dx, 0
     jnz APAGAR_ELEMENTO_LOOP
     
+    POP AX
     pop si
     pop di
     pop cx
     pop dx
+    ret
+endp
+
+; Verifica se o sprite 1 colide com o sprite 2
+; AX = coordenada linear do sprite 1
+; BX = coordenada linear do sprite 2
+; ZF ativo = houve colisão 
+VERIFICA_COLISAO_SPRITE proc
+    push CX
+    push DX
+    push DI
+    PUSH SI
+
+    ; Converte coordenada do sprite 1 para coordenada cartesiana
+    xor DI, DI
+    call ENDERECO_LINEAR_PARA_CARTESIANO
+    push AX ; x
+    mov CX, DX
+
+    
+    ; Converte coordenada do sprite 2 para coordenada cartesiana
+    mov AX, BX
+    call ENDERECO_LINEAR_PARA_CARTESIANO
+
+    push AX
+    push CX
+    push DX
+
+    ; Stack agora tem
+    ; RectA.X
+    ; RectB.X
+    ; RectA.Y
+    ; RectB.Y
+    
+
+    ; Verifica colisao na vertical
+    ;RectA.Y1 > RectB.Y2 && RectA.Y2 < RectB.Y1
+    ;AX > DX && CX < BX
+    pop BX ; b.Y1
+    pop AX ; a.Y1
+
+    mov DI, 4 ; Itens na pilha
+
+
+    mov CX, AX
+    add CX, 15
+
+    mov DX, BX
+    add DX, 15
+
+    cmp AX, DX
+    jge __NAO_COLIDE ; RectA.Y1 > RectB.Y2? NÃO há colisão.
+
+    cmp CX, BX
+    jle __NAO_COLIDE ; RectA.Y2 < RectB.Y1? NÃO há colisão.
+
+    ; Verifica colisão horizontal
+    pop AX ;aX1
+    pop BX ;bX1
+
+    xor DI, DI
+
+    mov CX, AX
+    add CX, 9 ; aX2
+
+    mov DX, BX
+    add DX, 9 ; bX2
+
+    cmp AX, DX
+    jg __NAO_COLIDE ; RectA.X1 > RectB.X2? NÃO há colisão.
+
+    cmp CX, BX
+    jl __NAO_COLIDE ; RectA.X2 < RectB.X1? NÃO há colisão.
+    ; AX > DX && CX < BX
+
+    mov CX, 1
+    jmp __FIM_VERIFICA_COLISAO_SPRITE
+
+    __NAO_COLIDE:
+        mov CX, 0
+        jmp __FIM_VERIFICA_COLISAO_SPRITE
+
+    __FIM_VERIFICA_COLISAO_SPRITE:
+        add SP, DI ; Desempilha os valores que ainda estao na pilha
+ 
+        cmp CX, 1
+
+        POP SI
+        pop DI
+        pop DX
+        pop CX
+    ret
+endp
+
+
+; AX: Endereço linear
+; Retorno:
+; AX = Linha (Y)
+; DX = Coluna (X)
+ENDERECO_LINEAR_PARA_CARTESIANO PROC
+    push BX
+
+    xor DX, DX 
+    mov BX, 320
+    div BX  ; AX = Linha, DX = Coluna
+
+    pop BX
+    ret
+endp
+
+; DI: Endereço linear da nave inimiga
+; Retorna:
+; ZF Se houver colisões
+CHECK_COLISAO_NAVES PROC
+    PUSH AX
+    PUSH BX
+    PUSH SI
+    PUSH DI
+    PUSH CX
+    PUSH DX
+    
+    MOV BX, DI
+    mov SI, offset array_naves_vivas ; SI aponta para o início do array
+    mov CX, 8                        ; Número de naves no array    
+    XOR DX, DX    ; Flag de colisão
+    
+check_loop:
+    mov AX, [SI]                     ; AX = Endereço linear da nave aliada
+    cmp AX, 0                        ; Verificar se o endereço é válido
+    je proximo                       ; Se for 0, vá para a próxima nave
+    
+    CALL VERIFICA_COLISAO_SPRITE
+    JE colisao_encontrada                      ; ZF não está ativo, não há colisões.
+    JMP proximo
+   
+colisao_encontrada:
+    MOV DX, 1
+    
+    ; APAGA A NAVE ALIADA.
+    MOV DI, [SI]
+    call APAGAR_ELEMENTO
+    ; Zera o endereço da nave aliada que foi apagada
+    MOV [SI], 0                      
+    jmp proximo                        
+
+proximo:
+    add si, 2                        ; Próxima nave no array (2 bytes por endereço)
+    loop check_loop                  ; Repetir para todas as naves
+    
+fim:
+    cmp DX, 1
+    
+    POP DX
+    POP CX
+    POP DI
+    POP SI
+    POP BX
     POP AX
     ret
 endp
 
+;DI: Posicao da nave inimiga
 MOVE_NAVE_ESQUERDA proc
-    push ax
     push bx
-    push cx
     push si
-    push di
-    
-    mov di, [posicao_nave_inimiga]              
+                  
     call APAGAR_ELEMENTO
+
+    sub di, 10                       ; Move 5 pixel para a esquerda.
     
-    mov di, [posicao_nave_inimiga]
-    sub di, 1 ; Move 1 pixel para a esquerda.
-    mov [posicao_nave_inimiga], di
+    CALL CHECK_COLISAO_NAVES
+    jz remove_nave_inimiga_array
+    
     MOV SI, offset nave_inimiga
-    mov BX, 9
-    mov AX, 15
-    mov BL, 0CH   ; VERMELHO
-    call DESENHA_ELEMENTO   
+    mov BL, 09H                     ; VERMELHO
+    call DESENHA_ELEMENTO 
+    JMP fim_move_nave_esquerda
     
-    pop di
+remove_nave_inimiga_array:
+    mov di, 0
+    jmp fim_move_nave_esquerda
+    
+fim_move_nave_esquerda:
     pop si
-    pop cx
     pop bx
-    pop ax
     ret
 endp
 
@@ -1013,9 +1191,10 @@ MOVER_ALIADA:
     jmp FIM_ANIMACAO
 
 MOVER_INIMIGA:
+    MOV DI, [posicao_nave_inimiga]
     call MOVE_NAVE_ESQUERDA
-    mov bx, [posicao_nave_inimiga]
-    cmp bx, limite_esquerda
+    MOV [posicao_nave_inimiga], DI
+    cmp DI, limite_esquerda
     jbe TROCAR_PARA_ALIADA 
     jmp FIM_ANIMACAO
 
@@ -1041,9 +1220,30 @@ FIM_ANIMACAO:
     ret
 endp
 
+;Funcao para reiniciar o timer do jogo
+RESETA_TEMPO_DE_JOGO proc
+    push ax
+    push bx
+    push cx
+    push dx
+    
+    ;add si, cx
+    ;mov cx, [si]
+    ;xor dx, dx
+    mov ax, timer_do_jogo
+    ;mul cx
+    mov timer, ax
+    
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+endp
+
 ;AL = char do numero da fase (ASCII)
 ;BL = Cor
-TELA_INICIAL_SETOR proc
+INICIO_FASE proc
     push BX
     push DX
     push CX
@@ -1181,13 +1381,12 @@ INICIAR_JOGO proc
     push BX
     push DX
     push CX
-    
+
+    ;TODO call Reseta_variaveis_jogo
     call INSTANCIA_NAVES_ARRAY
     
-    inc jogando
-    mov [score_num], 0
-    
     xor DL, DL
+    
     mov CX, Qtd_fases
 LOOP_DE_FASES:
     inc DL
@@ -1197,189 +1396,39 @@ LOOP_DE_FASES:
     mov BL, [array_cores_fases]
     inc array_cores_fases
     
-    call TELA_INICIAL_SETOR
-    call RESETA_VARIAVEIS_JOGO
-    call ATUALIZA_SCORE
+    call INICIO_FASE
     call INICIA_HUD
     call CRIA_NAVES_INICIO
     call CRIAR_TERRENO
     
+    mov [timer_do_jogo], Tempo_das_fases
+    
     call SALVAR_TEMPO_ATUAL
-    
     call FLUXO_JOGO
-    
-    cmp jogando, 0
-    jz FIM_JOGO
-    
-    call PROGRESSAO
-    CALL PONTUACAO_FIM_FASE
+    call AUMENTA_PROGRESSAO
     
     loop LOOP_DE_FASES
     
-FIM_JOGO:
-    call TELA_FINAL_JOGO
-
-    pop CX
-    pop DX
-    pop BX
-    pop AX
-    ret
-endp
-
-PONTUACAO_FIM_FASE proc
-    push SI
-    push CX
-    push AX
-    
-    mov SI, offset array_naves_vivas
-    xor AX, AX
-    
-    mov CX, 8
-LOOP_SOMA_ARRAY_NAVES_VIVAS:
-    cmp word ptr [SI], 0
-    jz CONTROLA_LOOP_SOMA_ARRAY_NAVES_VIVAS     
-    
-    add AX, Ponto_por_nave_viva
-CONTROLA_LOOP_SOMA_ARRAY_NAVES_VIVAS:
-    add SI, 2
-    loop LOOP_SOMA_ARRAY_NAVES_VIVAS
-    
-    mov SI, offset score_num
-    add AX, [SI]
-    
-    call MUDA_SCORE
-    call ATUALIZA_SCORE
-    pop AX
-    pop CX
-    pop SI
-    ret
-endp
-
-ATUALIZA_SCORE proc
-    push BX
-    push DX
-    push BP
-    
-    mov BL, 2
-    xor DX, DX
-    mov DL, 6    ; coluna
-    mov BP, offset score
-    call ESC_STRING
-    
-    pop BP
-    pop DX
-    pop BX
-    ret
-endp
-
-;recebe em AX o score
-MUDA_SCORE proc
-    push ax
-    push bx
-    push cx
-    push dx
-    push DI
-    push SI
-    
-    mov di, offset score_num
-    mov [di], AX
-
-    mov di, offset score   ; Apontar DI para o buffer
-    add di, 4        ; Come?ar a preencher o buffer do ?ltimo d?gito (posi??o 4)
-
-    mov cx, 5        ; N?mero de casas decimais a preencher
-    xor bx, bx       ; Limpar BX para divis?o
-    mov BX, 10
-    
-convert_loop_score:
-    xor dx, dx       ; Limpar DX (divis?o de 16 bits por 10)
-    div BX           ; Dividir AX por 10 (DX:AX / 10)
-    add dl, '0'      ; Converter o resto (em DL) para ASCII
-    mov [di], dl     ; Salvar o d?gito convertido no buffer
-    dec di           ; Mover para o pr?ximo d?gito no buffer
-    loop convert_loop_score
-
-    ; Preencher zeros ? esquerda, se necess?rio
-    mov si, offset score   ; Apontar SI para o in?cio do buffer
-    mov cx, 5        ; Tamanho fixo de 5 d?gitos
-fill_zeros:
-    cmp byte ptr [si], '0' ; Verificar se ? zero
-    jnz done_fill     ; Sair se encontrar o primeiro d?gito n?o-zero
-    inc si            ; Avan?ar no buffer
-    loop fill_zeros
-
-done_fill:
-    pop SI
-    pop DI
-    pop dx           ; Restaurar registradores
-    pop cx
-    pop bx
-    pop ax
-    ret
-endp
-
-TELA_FINAL_JOGO proc
-    push BX
-    push DX
-    push BP
-    push CX
-    
-    call LIMPAR_TELA
-    
-    ;Escreve a logo de inicio
-    mov BL, 2 ; cor VERDE
-    mov DH, 5 ; linha
-    mov DL, 2 ; coluna
-    mov BP, offset ascii_fim_de_jogo
-    call ESC_STRING
-    
-    ; espera um determinado tempo
-    mov CX, offset bit_alto_DelayTela
-    mov DX, offset bit_baixo_DelayTela
-    call DELAY
-    
+    ;call tela final
     call LIMPAR_TELA
     
     pop CX
-    pop BP
     pop DX
     pop BX
+    pop AX
     ret
 endp
 
-RESETA_VARIAVEIS_JOGO proc
-    push AX
+AUMENTA_PROGRESSAO:
+    push SI
     push CX
-    push SI
     
-    mov [timer_do_jogo], Tempo_das_fases
+    ;mov SI, offset Fator_de_progressao_fase
+    ;mov CX, [SI]
+    ;mov SI, offset limite_naves_inimigas
+    ;add [SI], CX
     
-    mov SI, offset array_naves_inimigas
-    mov CX, limite_array_naves
-    mov AL, 0
-LOOP_RESETA_ARRAY_NAVES:
-    mov [SI], AL
-    add SI, 2
-    
-    loop LOOP_RESETA_ARRAY_NAVES
-    
-    mov [naves_inimigas_na_fase], 0
-    
-    pop SI
     pop CX
-    pop AX
-    ret
-endp
-
-PROGRESSAO proc
-    push SI
-    push AX
-    
-    mov AX, Fator_de_progressao_fase
-    mov SI, offset limite_naves_inimigas
-    add [SI], AX
-    
-    pop AX
     pop SI
     ret
 endp
