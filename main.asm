@@ -14,6 +14,8 @@
     
     Qtd_Naves_Inimigas_Fase_1 equ 10
     
+    Qtd_fases equ 3
+    Tempo_das_fases equ 5
 ;CONSTANTES DE TEMPO
     bit_alto_DelayMovNaveTelaInicial equ 0000h
     bit_baixo_DelayMovNaveTelaInicial equ 030D4h 
@@ -38,7 +40,7 @@
     
 ;-------------------------------------------------------------------------------------------
     ;MENU
-    timer_do_jogo dw 60
+    timer_do_jogo dw [Tempo_das_fases]
     last_rtc_timer db ?
     score db "00000$"
 ;-------------------------------------------------------------------------------------------       
@@ -50,6 +52,7 @@ cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
 
 naves_inimigas db 0
 array_naves_inimigas_fase_1 dw [Qtd_Naves_Inimigas_Fase_1] dup(0)
+array_cores_fases db 2, 3, 4
 
 ;-------------------------------------------------------------------------------------------        
     ;Sprites
@@ -179,12 +182,16 @@ SALVAR_TEMPO_ATUAL proc
     POP CX
     POP DX
     POP AX
-    
     ret
 endp
 
 
 INICIA_HUD proc
+    push AX
+    push BX
+    push DX
+    push SI
+    
     ;Escreve o start de inicio com o botao
     mov BL, 15   ; branca
     mov DH, 0    ; linha
@@ -209,6 +216,10 @@ INICIA_HUD proc
     mov AX, SI
     call MUDA_TIMER
     
+    pop SI
+    pop DX
+    pop BX
+    pop AX
     stosw
     ret
 endp 
@@ -322,6 +333,7 @@ endp
 CRIA_NAVES_INICIO proc
     push BX
     push DI
+    push AX
     
     call DESENHA_NAVES_ARRAY
     
@@ -330,7 +342,8 @@ CRIA_NAVES_INICIO proc
     MOV [posicao_nave], 28820
     MOV DI, [posicao_nave]
     CALL DESENHA_NAVE
-
+    
+    pop AX
     pop DI
     pop BX
     ret
@@ -414,7 +427,7 @@ CRIAR_TERRENO proc
     push cx
     push di
     push si
-
+    
     mov si, offset terreno  
     mov di, 57600          
     mov dx, 20              
@@ -427,7 +440,7 @@ CRIAR_TERRENO_LOOP:
     dec dx                  
     cmp dx, 0               
     jnz CRIAR_TERRENO_LOOP 
-
+    
     pop si
     pop di
     pop cx
@@ -527,26 +540,11 @@ DESENHA_NAVE_INIMIGA proc
     ret
 endp
 
+FLUXO_JOGO proc
+    push AX
+    push DX
+    push CX
 
-FASE_1 proc
-    mov BL, 2
-    mov AL, 49 ;1 em char
-    
-    call INICIO_FASE
-    call INICIA_HUD
-    call INSTANCIA_NAVES_ARRAY
-    call CRIA_NAVES_INICIO
-    call CRIAR_TERRENO
-
-    ; Configura o temporizador para gerar interrup??es
-    MOV [timer_do_jogo], 60
-    call SALVAR_TEMPO_ATUAL
-    
-    ;call GERA_ENDERECO_ALEATORIO
-    ;mov BL, 04h
-    ;call DESENHA_NAVE
-    ;CALL RESETA_TEMPO_DE_JOGO
-    
 LOOP_FASE:
     ; Interrupcao de input do teclado, resultado em AX
     MOV AH, 01H
@@ -585,7 +583,7 @@ ATUALIZA_TEMPO:
     dec AX
     
     cmp AX, 0
-    jz PASSA_FASE
+    jz SAIR_FLUXO_JOGO
     
     call CRIA_NAVE_INIMIGA
     
@@ -601,8 +599,12 @@ APERTOU_BAIXO:
 APERTOU_CIMA:
     CALL MOVE_NAVE_CIMA
     JMP CONTINUA_LOOP_FASE
-PASSA_FASE:
-    ;call FASE_2
+
+SAIR_FLUXO_JOGO:
+    pop CX
+    pop DX
+    pop AX
+    ret
 endp
 
 LIMPAR_TELA proc
@@ -620,10 +622,9 @@ LIMPAR_TELA proc
     rep stosb
     
     pop DI
-    pop CX
     pop DX
+    pop CX
     pop AX
-    
     ret
 endp
   
@@ -646,7 +647,7 @@ GERA_ENDERECO_ALEATORIO proc
     push DX
     
 ;Gera linha retirando 20 da HUD e 20 do terreno
-    mov BX, 160
+    mov BX, 149
     call GERA_NUM_ALEATORIO
     mov BX, 320         
     mul BX              
@@ -660,8 +661,9 @@ GERA_ENDERECO_ALEATORIO proc
     mov BX, 145
     call GERA_NUM_ALEATORIO
     
-;Soma 160 na coluna
+    ;Soma 160 na coluna - 11 do mapa
     add AX, 160
+    
     add DI, AX
     
     pop DX
@@ -1021,23 +1023,6 @@ RESETA_TEMPO_DE_JOGO proc
     ret
 endp
 
-FLUXO_JOGO:
-    xor dx, dx
-    mov ax, timer
-    dec ax
-    mov timer, ax
-    
-    mov DI, 10000
-    
-    stosw
-    
-    ;mov bx, jogando
-    ;cmp bx, 1
-    ;je FLUXO_JOGO
-    
-    ret
-endp
-
 ;AL = char do numero da fase (ASCII)
 ;BL = Cor
 INICIO_FASE proc
@@ -1162,14 +1147,56 @@ FIM_MENU_INICIAL:
     jnz FIM_TELA_INICIAL
     
 CHAMA_INICIO:
-    ;call INICIAR_JOGO
-    call FASE_1
+    call INICIAR_JOGO
+    ;call FASE_1
 FIM_TELA_INICIAL:
     
     mov ah, 00h
     int 16h
     ;call LIMPAR_TELA
     ;call FIM_PROGRAMA
+    ret
+endp
+
+INICIAR_JOGO proc
+    push AX
+    push BX
+    push DX
+    push CX
+
+    ;TODO call Reseta_variaveis_jogo
+    call INSTANCIA_NAVES_ARRAY
+    
+    xor DL, DL
+    
+    mov CX, Qtd_fases
+LOOP_DE_FASES:
+    inc DL
+    
+    mov AL, 48
+    add AL, DL
+    mov BL, [array_cores_fases]
+    inc array_cores_fases
+    
+    call INICIO_FASE
+    call INICIA_HUD
+    call CRIA_NAVES_INICIO
+    call CRIAR_TERRENO
+    
+    mov [timer_do_jogo], Tempo_das_fases
+    
+    call SALVAR_TEMPO_ATUAL
+    call FLUXO_JOGO
+    
+    loop LOOP_DE_FASES
+    
+    ;call tela final
+    call LIMPAR_TELA
+    
+    pop CX
+    pop DX
+    pop BX
+    pop AX
     ret
 endp
 
@@ -1254,6 +1281,7 @@ ESC_STRING proc
     push dx
     push si
     push bp
+    push CX
     
     mov di, sp
     
@@ -1268,6 +1296,8 @@ ESC_STRING proc
     int 10h
     
     mov sp, di
+    
+    pop CX
     pop bp
     pop si
     pop dx
@@ -1280,6 +1310,7 @@ endp
 CALCULA_TAM_STRING proc
     push ax
     push si
+    
     xor cx, cx
 LOOP_TAM_STRING:
     xor ax, ax
