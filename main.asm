@@ -5,26 +5,26 @@
 .data 
 ;-------------------------------------------------------------------------------------------
 ;Constantes
-    
-; Constantes para pular linha
-    CR           EQU 13
-    LF           EQU 10
-    tecla_cima   equ 72
-    tecla_baixo  equ 80
-    tecla_espaco equ 32
-    memoria_video equ 0A000h
-    
+    CR                       equ 13
+    LF                       equ 10
+    tecla_cima               equ 72
+    tecla_baixo              equ 80
+    tecla_espaco             equ 32
+    limite_array_naves       equ 20
     Fator_de_progressao_fase equ 5
+    Qtd_fases                equ 3
+    Tempo_das_fases          equ 10
     
-    Qtd_fases equ 3
-    Tempo_das_fases equ 5
+    memoria_video      equ 0A000h
+    
 ;CONSTANTES DE TEMPO
     bit_alto_DelayMovNaveTelaInicial equ 0000h
     bit_baixo_DelayMovNaveTelaInicial equ 030D4h 
     
     bit_alto_DelayTela equ 001Eh
     bit_baixo_DelayTela equ 8480h
-    
+
+;CONSTANTES DE TEMPO   
     posicao_nave       dw       ?
 
     limite_inferior             equ 51220 ; 320 * (200 - 9) + 20 (200 - altura do desenho (9) - altura do terreno (20) - 11 (espa?o entre a nave vermelha e o terreno)) + coluna
@@ -41,17 +41,15 @@
     last_rtc_timer db ?
     score db "00000$"
 ;-------------------------------------------------------------------------------------------       
-;Variaveis de jogo
-timer dw 0
-jogando dw 0 ; status do jogo (em jogo=1; menu=0)
-naves_vivas dw 8 dup(?)
-cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
+    ;Variaveis de jogo
+    jogando dw 0 ; status do jogo (em jogo=1; menu=0)
+    naves_vivas dw 8 dup(?)
+    cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
 
-naves_inimigas_na_fase db 0
-limite_naves_inimigas db 10
-array_naves_inimigas dw 20 dup(0)
-array_cores_fases db 2, 3, 4
-
+    naves_inimigas_na_fase db 0
+    limite_naves_inimigas db 2
+    array_naves_inimigas dw [limite_array_naves] dup(0)
+    array_cores_fases db 2, 3, 4
 ;-------------------------------------------------------------------------------------------        
     ;Sprites
     logo_inicio db "       __ __    ______           ", CR, LF
@@ -208,7 +206,6 @@ INICIA_HUD proc
     mov BP, offset string_tempo
     call ESC_STRING
     
-    mov SI, offset timer
     mov SI, timer_do_jogo
     
     mov AX, SI
@@ -256,8 +253,8 @@ MUDA_TIMER proc
     call POS_CURSOR
     call ESC_UINT16
     
-    mov SI, offset timer
-    mov SI, AX
+    ;mov SI, offset timer
+    ;mov SI, AX
     
     pop DX
     pop CX
@@ -524,8 +521,7 @@ GET_ARRAY_NAVES_INIMIGAS proc
     push CX
     push AX
     
-    mov CX, 20
-    
+    mov CX, limite_array_naves
     mov SI, offset array_naves_inimigas
 LOOP_GET_NAVES:
     xor AX, AX
@@ -862,7 +858,7 @@ MOVE_NAVE_ESQUERDA proc
     call APAGAR_ELEMENTO
     
     mov di, [posicao_nave_inimiga]
-    sub di, 1                   ; Move 1 pixel para a esquerda.
+    sub di, 1 ; Move 1 pixel para a esquerda.
     mov [posicao_nave_inimiga], di
     MOV SI, offset nave_inimiga
     mov BX, 9
@@ -1031,12 +1027,7 @@ RESETA_TEMPO_DE_JOGO proc
     push cx
     push dx
     
-    ;add si, cx
-    ;mov cx, [si]
-    ;xor dx, dx
-    mov ax, timer_do_jogo
-    ;mul cx
-    mov timer, ax
+    mov [timer_do_jogo], Tempo_das_fases
     
     pop dx
     pop cx
@@ -1185,8 +1176,7 @@ INICIAR_JOGO proc
     push BX
     push DX
     push CX
-
-    ;TODO call Reseta_variaveis_jogo
+    
     call INSTANCIA_NAVES_ARRAY
     
     xor DL, DL
@@ -1201,11 +1191,10 @@ LOOP_DE_FASES:
     inc array_cores_fases
     
     call INICIO_FASE
+    call RESETA_VARIAVEIS_JOGO
     call INICIA_HUD
     call CRIA_NAVES_INICIO
     call CRIAR_TERRENO
-    
-    mov [timer_do_jogo], Tempo_das_fases
     
     call SALVAR_TEMPO_ATUAL
     call FLUXO_JOGO
@@ -1219,6 +1208,30 @@ LOOP_DE_FASES:
     pop CX
     pop DX
     pop BX
+    pop AX
+    ret
+endp
+
+RESETA_VARIAVEIS_JOGO proc
+    push AX
+    push CX
+    push SI
+    
+    call RESETA_TEMPO_DE_JOGO
+    
+    mov SI, offset array_naves_inimigas
+    mov CX, limite_array_naves
+    mov AL, 0
+LOOP_RESETA_ARRAY_NAVES:
+    mov [SI], AL
+    add SI, 2
+    
+    loop LOOP_RESETA_ARRAY_NAVES
+    
+    mov [naves_inimigas_na_fase], 0
+    
+    pop SI
+    pop CX
     pop AX
     ret
 endp
