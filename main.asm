@@ -12,10 +12,10 @@
     
     memoria_video equ 0A000h
     
-    Qtd_Naves_Inimigas_Fase_1 equ 10
+    Fator_de_progressao_fase equ 5
     
     Qtd_fases equ 3
-    Tempo_das_fases equ 5
+    Tempo_das_fases equ 20
 ;CONSTANTES DE TEMPO
     bit_alto_DelayMovNaveTelaInicial equ 0000h
     bit_baixo_DelayMovNaveTelaInicial equ 030D4h 
@@ -36,8 +36,6 @@
     posicao_nave_inimiga dw     ?           ; Usado no menu inicial
     nave_atual_inicio db        0           ; Define qual nave sera mostrada na animacao do menu inicial, 0 = nave aliada, 1 = nave inimiga.
     
-    
-    
 ;-------------------------------------------------------------------------------------------
     ;MENU
     timer_do_jogo dw [Tempo_das_fases]
@@ -51,7 +49,8 @@ naves_vivas dw 8 dup(?)
 cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
 
 naves_inimigas db 0
-array_naves_inimigas_fase_1 dw [Qtd_Naves_Inimigas_Fase_1] dup(0)
+Qtd_Naves_Inimigas db 10
+array_naves_inimigas dw 20 dup(0)
 array_cores_fases db 2, 3, 4
 
 ;-------------------------------------------------------------------------------------------        
@@ -491,33 +490,35 @@ CRIA_NAVE_INIMIGA proc
     push DX
     push SI
     push DI
+    push BP
     
     mov SI, offset naves_inimigas
-    mov DX, Qtd_Naves_Inimigas_Fase_1
-    cmp DX, [SI]
+    mov DL, offset Qtd_Naves_Inimigas
+    cmp DL, [SI]
     jz SAIR_CRIA_NAVE
     
-    mov BP, offset array_naves_inimigas_fase_1
-    sub BP, 2
+    mov BP, offset array_naves_inimigas
 LOOP_ARRAY_NAVES_INIMIGAS:
-    add BP, 2
     mov AX, [BP] 
     cmp AX, 0
     jnz LOOP_ARRAY_NAVES_INIMIGAS
 LOOP_GERA_ENDERECO_ALEATORIO:
     call GERA_ENDERECO_ALEATORIO
-    
     call VERIFICA_SPAWN_NAVE_INIMIGA
+    
     cmp BL, 0
     jnz SAIR_CRIA_NAVE
     
+    add BP, 2
     mov [BP], DI
+    
     call DESENHA_NAVE_INIMIGA
     
-    mov DX, [SI]
-    inc DX
-    mov [SI], DX
+    mov DL, [SI]
+    inc DL
+    mov [SI], DL
 SAIR_CRIA_NAVE:
+    pop BP
     pop DI
     pop SI
     pop DX
@@ -631,8 +632,8 @@ endp
 POS_CURSOR proc
     push ax
     push bx
-    mov ah, 02                   ;Codigo da funcao
-    int 10h                      ;Interrupcao
+    mov ah, 02;Codigo da funcao
+    int 10h   ;Interrupcao
     pop bx
     pop ax
     ret
@@ -783,8 +784,6 @@ DESENHA_QUADRADO_BOTAO proc
     pop AX
     ret
 endp
-
-
 
 ;Recebe em CX parte alta em microsegundos
 ;Recebe em DX parte baixa em microsegundos
@@ -1187,6 +1186,7 @@ LOOP_DE_FASES:
     
     call SALVAR_TEMPO_ATUAL
     call FLUXO_JOGO
+    call AUMENTA_PROGRESSAO
     
     loop LOOP_DE_FASES
     
@@ -1197,6 +1197,20 @@ LOOP_DE_FASES:
     pop DX
     pop BX
     pop AX
+    ret
+endp
+
+AUMENTA_PROGRESSAO:
+    push SI
+    push CX
+    
+    mov SI, offset Fator_de_progressao_fase
+    mov CX, [SI]
+    mov SI, offset Qtd_Naves_Inimigas
+    add [SI], CX
+    
+    pop CX
+    pop SI
     ret
 endp
 
