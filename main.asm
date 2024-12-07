@@ -42,12 +42,13 @@
     score db "00000$"
 ;-------------------------------------------------------------------------------------------       
     ;Variaveis de jogo
-    jogando dw 0 ; status do jogo (em jogo=1; menu=0)
+    jogando db 0 ; status do jogo (em jogo=1; menu=0)
     naves_inimigas_na_fase db 0
     limite_naves_inimigas db 2
+    score_num db 0
     
     array_cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
-    array_naves_vivas dw 8 dup(?)
+    array_naves_vivas dw 8 dup(0)
     array_naves_inimigas dw [limite_array_naves] dup(0)
     array_cores_fases db 2, 3, 4
 ;-------------------------------------------------------------------------------------------        
@@ -100,7 +101,13 @@
             db 97 dup(06H),  25 dup(0BH),  358 dup(06H) 
             db 99 dup(06H),  22 dup(0BH),  359 dup(06H) 
             db 100 dup(06H),  20 dup(0BH),  360 dup(06H) 
-            db 105 dup(06H),  12 dup(0BH),  363 dup(06H) 
+            db 105 dup(06H),  12 dup(0BH),  363 dup(06H)
+            
+    ascii_fim_de_jogo db " _____ _  _        ____  _____      _  ____  _____ ____ ", CR, LF
+                      db "/    // \/ \__/|  /  _ \/  __/     / |/  _ \/  __//  _ \", CR, LF
+                      db "|  __\| || |\/||  | | \||  \       | || / \|| |  _| / \|", CR, LF
+                      db "| |   | || |  ||  | |_/||  /_   /\_| || \_/|| |_//| \_/|", CR, LF
+                      db "\_/   \_/\_/  \|  \____/\____\  \____/\____/\____\\____/$", CR, LF
                 
 ;-------------------------------------------------------------------------------------------
 ;STRINGS
@@ -118,6 +125,8 @@
 ; DI: Posicao do primeiro pixel do desenho no video
 ; BL: Cor da nave
 DESENHA_ELEMENTO proc
+    push AX
+    push BX
     push dx
     push cx
     push di
@@ -153,6 +162,8 @@ FIM_DESENHA_ELEMENTO:
     pop di
     pop cx
     pop dx
+    pop BX
+    pop AX
     ret
 endp
 
@@ -372,34 +383,34 @@ endp
 DESENHA_NAVES_ARRAY proc
     push BX
     push CX
+    push AX
     push DI
     push SI
-    push BP
     
-    mov BP, offset array_naves_vivas
-    mov SI, offset array_cores_naves
+    mov SI, offset array_naves_vivas
+    xor AX, AX
+    xor BX, BX
     
-    mov CX, 8 ;TAMANHO DO ARRAY
+    mov CX, 8
 LOOP_DESENHA_ARRAY:
-    ;mov DI, AX
-    mov BX, [BP]
-    
-    cmp BX, 0
+    cmp word ptr [SI], 0
     jz CONTROLA_LOOP     
     
 DESENHA:
-    mov DI, BX
-    xor BX, BX
-    mov BL, [SI]
+    mov DI, offset array_cores_naves
+    add DI, AX
+    
+    mov BL, [DI]
+    mov DI, [SI]
     call DESENHA_NAVE
 CONTROLA_LOOP:
-    add BP, 2
-    inc SI
+    add SI, 2
+    inc AL
     loop LOOP_DESENHA_ARRAY
-    
-    pop BP
+
     pop SI
     pop DI
+    pop AX
     pop CX
     pop BX
     ret
@@ -1020,15 +1031,9 @@ FIM_ANIMACAO:
     ret
 endp
 
-;Funcao para reiniciar o timer do jogo
-RESETA_TEMPO_DE_JOGO proc
-    mov [timer_do_jogo], Tempo_das_fases
-    ret
-endp
-
 ;AL = char do numero da fase (ASCII)
 ;BL = Cor
-INICIO_FASE proc
+TELA_INICIAL_SETOR proc
     push BX
     push DX
     push CX
@@ -1169,8 +1174,9 @@ INICIAR_JOGO proc
     
     call INSTANCIA_NAVES_ARRAY
     
-    xor DL, DL
+    inc jogando
     
+    xor DL, DL
     mov CX, Qtd_fases
 LOOP_DE_FASES:
     inc DL
@@ -1180,25 +1186,119 @@ LOOP_DE_FASES:
     mov BL, [array_cores_fases]
     inc array_cores_fases
     
-    call INICIO_FASE
+    call TELA_INICIAL_SETOR
     call RESETA_VARIAVEIS_JOGO
+    call ATUALIZA_SCORE
     call INICIA_HUD
     call CRIA_NAVES_INICIO
     call CRIAR_TERRENO
     
     call SALVAR_TEMPO_ATUAL
+    
     call FLUXO_JOGO
+    
+    cmp jogando, 0
+    jz FIM_JOGO
+    
+    
     call PROGRESSAO
+    ;CALL inc_pontuacao
     
     loop LOOP_DE_FASES
     
-    ;call tela final
-    call LIMPAR_TELA
-    
+FIM_JOGO:
+    call TELA_FINAL_JOGO
+
     pop CX
     pop DX
     pop BX
     pop AX
+    ret
+endp
+
+ATUALIZA_SCORE proc
+    push BX
+    push DX
+    push BP
+    
+    mov BL, 2
+    xor DX, DX
+    mov DL, 6    ; coluna
+    mov BP, offset score
+    call ESC_STRING
+    
+    pop BP
+    pop DX
+    pop BX
+    ret
+endp
+
+;recebe em AX o tempo
+;Printa no local do tempo correto
+MUDA_SCORE proc
+    push ax          ; Salvar AX
+    push bx          ; Salvar BX
+    push cx          ; Salvar CX
+    push dx          ; Salvar DX
+
+    mov di, offset score   ; Apontar DI para o buffer
+    add di, 4        ; Come?ar a preencher o buffer do ?ltimo d?gito (posi??o 4)
+
+    mov cx, 5        ; N?mero de casas decimais a preencher
+    xor bx, bx       ; Limpar BX para divis?o
+    mov BX, 10
+    
+convert_loop_score:
+    xor dx, dx       ; Limpar DX (divis?o de 16 bits por 10)
+    div BX           ; Dividir AX por 10 (DX:AX / 10)
+    add dl, '0'      ; Converter o resto (em DL) para ASCII
+    mov [di], dl     ; Salvar o d?gito convertido no buffer
+    dec di           ; Mover para o pr?ximo d?gito no buffer
+    loop convert_loop_score
+
+    ; Preencher zeros ? esquerda, se necess?rio
+    mov si, offset score   ; Apontar SI para o in?cio do buffer
+    mov cx, 5        ; Tamanho fixo de 5 d?gitos
+fill_zeros:
+    cmp byte ptr [si], '0' ; Verificar se ? zero
+    jnz done_fill     ; Sair se encontrar o primeiro d?gito n?o-zero
+    inc si            ; Avan?ar no buffer
+    loop fill_zeros
+
+done_fill:
+    pop dx           ; Restaurar registradores
+    pop cx
+    pop bx
+    pop ax
+    ret
+endp
+
+TELA_FINAL_JOGO proc
+    push BX
+    push DX
+    push BP
+    push CX
+    
+    call LIMPAR_TELA
+    
+    ;Escreve a logo de inicio
+    mov BL, 2 ; cor VERDE
+    mov DH, 0 ; linha
+    mov DL, 0 ; coluna
+    mov BP, offset ascii_fim_de_jogo
+    call ESC_STRING
+    
+    ; espera um determinado tempo
+    mov CX, offset bit_alto_DelayTela
+    mov DX, offset bit_baixo_DelayTela
+    call DELAY
+    
+    call LIMPAR_TELA
+    
+    pop CX
+    pop BP
+    pop DX
+    pop BX
     ret
 endp
 
@@ -1207,7 +1307,7 @@ RESETA_VARIAVEIS_JOGO proc
     push CX
     push SI
     
-    call RESETA_TEMPO_DE_JOGO
+    mov [timer_do_jogo], Tempo_das_fases
     
     mov SI, offset array_naves_inimigas
     mov CX, limite_array_naves
