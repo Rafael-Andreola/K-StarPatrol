@@ -13,7 +13,8 @@
     limite_array_naves       equ 20
     Fator_de_progressao_fase equ 5
     Qtd_fases                equ 3
-    Tempo_das_fases          equ 10
+    Tempo_das_fases          equ 5
+    Ponto_por_nave_viva      equ 100
     
     memoria_video      equ 0A000h
     
@@ -45,7 +46,7 @@
     jogando db 0 ; status do jogo (em jogo=1; menu=0)
     naves_inimigas_na_fase db 0
     limite_naves_inimigas db 2
-    score_num db 0
+    score_num dw 0
     
     array_cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
     array_naves_vivas dw 8 dup(0)
@@ -103,11 +104,20 @@
             db 100 dup(06H),  20 dup(0BH),  360 dup(06H) 
             db 105 dup(06H),  12 dup(0BH),  363 dup(06H)
             
-    ascii_fim_de_jogo db " _____ _  _        ____  _____      _  ____  _____ ____ ", CR, LF
-                      db "/    // \/ \__/|  /  _ \/  __/     / |/  _ \/  __//  _ \", CR, LF
-                      db "|  __\| || |\/||  | | \||  \       | || / \|| |  _| / \|", CR, LF
-                      db "| |   | || |  ||  | |_/||  /_   /\_| || \_/|| |_//| \_/|", CR, LF
-                      db "\_/   \_/\_/  \|  \____/\____\  \____/\____/\____\\____/$", CR, LF
+    ascii_fim_de_jogo db "                                    ", CR, LF
+                      db "    _____ _  _        ____  _____   ", CR, LF
+                      db "   /    // \/ \__/|  /  _ \/  __/   ", CR, LF
+                      db "   |  __\| || |\/||  | | \||  \     ", CR, LF
+                      db "   | |   | || |  ||  | |_/||  /_    ", CR, LF
+                      db "   \_/   \_/\_/  \|  \____/\____\   ", CR, LF
+                      db "                                    ", CR, LF
+                      db "       _  ____  _____ ____          ", CR, LF
+                      db "      / |/  _ \/  __//  _ \         ", CR, LF
+                      db "      | || / \|| |  _| / \|         ", CR, LF
+                      db "   /\_| || \_/|| |_//| \_/|         ", CR, LF
+                      db "   \____/\____/\____\\____/         ", CR, LF
+                      db "                                    $", CR, LF
+
                 
 ;-------------------------------------------------------------------------------------------
 ;STRINGS
@@ -1175,6 +1185,7 @@ INICIAR_JOGO proc
     call INSTANCIA_NAVES_ARRAY
     
     inc jogando
+    mov [score_num], 0
     
     xor DL, DL
     mov CX, Qtd_fases
@@ -1200,9 +1211,8 @@ LOOP_DE_FASES:
     cmp jogando, 0
     jz FIM_JOGO
     
-    
     call PROGRESSAO
-    ;CALL inc_pontuacao
+    CALL PONTUACAO_FIM_FASE
     
     loop LOOP_DE_FASES
     
@@ -1213,6 +1223,35 @@ FIM_JOGO:
     pop DX
     pop BX
     pop AX
+    ret
+endp
+
+PONTUACAO_FIM_FASE proc
+    push SI
+    push CX
+    push AX
+    
+    mov SI, offset array_naves_vivas
+    xor AX, AX
+    
+    mov CX, 8
+LOOP_SOMA_ARRAY_NAVES_VIVAS:
+    cmp word ptr [SI], 0
+    jz CONTROLA_LOOP_SOMA_ARRAY_NAVES_VIVAS     
+    
+    add AX, Ponto_por_nave_viva
+CONTROLA_LOOP_SOMA_ARRAY_NAVES_VIVAS:
+    add SI, 2
+    loop LOOP_SOMA_ARRAY_NAVES_VIVAS
+    
+    mov SI, offset score_num
+    add AX, [SI]
+    
+    call MUDA_SCORE
+    call ATUALIZA_SCORE
+    pop AX
+    pop CX
+    pop SI
     ret
 endp
 
@@ -1233,13 +1272,17 @@ ATUALIZA_SCORE proc
     ret
 endp
 
-;recebe em AX o tempo
-;Printa no local do tempo correto
+;recebe em AX o score
 MUDA_SCORE proc
-    push ax          ; Salvar AX
-    push bx          ; Salvar BX
-    push cx          ; Salvar CX
-    push dx          ; Salvar DX
+    push ax
+    push bx
+    push cx
+    push dx
+    push DI
+    push SI
+    
+    mov di, offset score_num
+    mov [di], AX
 
     mov di, offset score   ; Apontar DI para o buffer
     add di, 4        ; Come?ar a preencher o buffer do ?ltimo d?gito (posi??o 4)
@@ -1266,6 +1309,8 @@ fill_zeros:
     loop fill_zeros
 
 done_fill:
+    pop SI
+    pop DI
     pop dx           ; Restaurar registradores
     pop cx
     pop bx
@@ -1283,8 +1328,8 @@ TELA_FINAL_JOGO proc
     
     ;Escreve a logo de inicio
     mov BL, 2 ; cor VERDE
-    mov DH, 0 ; linha
-    mov DL, 0 ; coluna
+    mov DH, 5 ; linha
+    mov DL, 2 ; coluna
     mov BP, offset ascii_fim_de_jogo
     call ESC_STRING
     
