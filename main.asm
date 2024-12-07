@@ -7,15 +7,17 @@
 ;Constantes
     
 ; Constantes para pular linha
-    CR EQU 13
-    LF EQU 10
-    
+    CR           EQU 13
+    LF           EQU 10
+    tecla_cima   equ 72
+    tecla_baixo  equ 80
+    tecla_espaco equ 32
     memoria_video equ 0A000h
     
     Fator_de_progressao_fase equ 5
     
     Qtd_fases equ 3
-    Tempo_das_fases equ 20
+    Tempo_das_fases equ 5
 ;CONSTANTES DE TEMPO
     bit_alto_DelayMovNaveTelaInicial equ 0000h
     bit_baixo_DelayMovNaveTelaInicial equ 030D4h 
@@ -24,12 +26,9 @@
     bit_baixo_DelayTela equ 8480h
     
     posicao_nave       dw       ?
-    tecla_cima                  equ 72
-    tecla_baixo                 equ 80
-    tecla_espaco                equ 32
+
     limite_inferior             equ 51220 ; 320 * (200 - 9) + 20 (200 - altura do desenho (9) - altura do terreno (20) - 11 (espa?o entre a nave vermelha e o terreno)) + coluna
     limite_superior             equ 6420  ; 320 * 20 + 20
-    
     limite_direita              equ 32305   ; usado na tela inicial.
     limite_esquerda             equ 32000   ; usado na tela inicial
     
@@ -48,8 +47,8 @@ jogando dw 0 ; status do jogo (em jogo=1; menu=0)
 naves_vivas dw 8 dup(?)
 cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
 
-naves_inimigas db 0
-Qtd_Naves_Inimigas db 10
+naves_inimigas_na_fase db 0
+limite_naves_inimigas db 10
 array_naves_inimigas dw 20 dup(0)
 array_cores_fases db 2, 3, 4
 
@@ -490,18 +489,11 @@ CRIA_NAVE_INIMIGA proc
     push DX
     push SI
     push DI
-    push BP
     
-    mov SI, offset naves_inimigas
-    mov DL, offset Qtd_Naves_Inimigas
-    cmp DL, [SI]
+    mov DL, [limite_naves_inimigas]
+    cmp DL, naves_inimigas_na_fase
     jz SAIR_CRIA_NAVE
     
-    mov BP, offset array_naves_inimigas
-LOOP_ARRAY_NAVES_INIMIGAS:
-    mov AX, [BP] 
-    cmp AX, 0
-    jnz LOOP_ARRAY_NAVES_INIMIGAS
 LOOP_GERA_ENDERECO_ALEATORIO:
     call GERA_ENDERECO_ALEATORIO
     call VERIFICA_SPAWN_NAVE_INIMIGA
@@ -509,21 +501,52 @@ LOOP_GERA_ENDERECO_ALEATORIO:
     cmp BL, 0
     jnz SAIR_CRIA_NAVE
     
-    add BP, 2
-    mov [BP], DI
+    call GET_ARRAY_NAVES_INIMIGAS
+    
+    cmp SI, 0
+    jz SAIR_CRIA_NAVE
+    
+    mov [SI], DI
     
     call DESENHA_NAVE_INIMIGA
     
-    mov DL, [SI]
-    inc DL
-    mov [SI], DL
+    inc [naves_inimigas_na_fase]
 SAIR_CRIA_NAVE:
-    pop BP
     pop DI
     pop SI
     pop DX
     pop BX
     pop AX
+    ret
+endp
+
+GET_ARRAY_NAVES_INIMIGAS proc
+    push CX
+    push AX
+    
+    mov CX, 20
+    
+    mov SI, offset array_naves_inimigas
+LOOP_GET_NAVES:
+    xor AX, AX
+    cmp CX, 0
+    jz SAIR_GET_NAVES
+    dec CX
+    
+    mov AX, [SI]
+    add SI, 2
+    
+    cmp AX, 0
+    jnz LOOP_GET_NAVES
+    
+    sub SI, 2
+    mov AX, SI
+    
+SAIR_GET_NAVES:
+    mov SI, AX
+    
+    pop AX
+    pop CX
     ret
 endp
 
@@ -1171,8 +1194,8 @@ INICIAR_JOGO proc
     mov CX, Qtd_fases
 LOOP_DE_FASES:
     inc DL
-    
     mov AL, 48
+    
     add AL, DL
     mov BL, [array_cores_fases]
     inc array_cores_fases
@@ -1204,10 +1227,10 @@ AUMENTA_PROGRESSAO:
     push SI
     push CX
     
-    mov SI, offset Fator_de_progressao_fase
-    mov CX, [SI]
-    mov SI, offset Qtd_Naves_Inimigas
-    add [SI], CX
+    ;mov SI, offset Fator_de_progressao_fase
+    ;mov CX, [SI]
+    ;mov SI, offset limite_naves_inimigas
+    ;add [SI], CX
     
     pop CX
     pop SI
