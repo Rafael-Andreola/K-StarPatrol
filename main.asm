@@ -1029,9 +1029,8 @@ CHECK_COLISAO_NAVE_VIVA proc
     JMP fim_check_colisao_nave_viva
     
 colisao_nave_viva:
-    ;MOV CX, [naves_aliadas_vivas]
-    ;DEC CX
-    ;cmp CX, 0
+    ; CMP [naves_aliadas_vivas], 0
+    ; JE FIM_FASE
     ; CHAMA O FIM DA FASE POIS TODAS AS NAVES FORAM DESTRUÍDAS.
     
     mov SI, offset array_naves_aliadas 
