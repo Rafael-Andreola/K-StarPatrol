@@ -112,19 +112,33 @@
             db 100 dup(06H),  20 dup(0BH),  360 dup(06H) 
             db 105 dup(06H),  12 dup(0BH),  363 dup(06H)
             
-    ascii_fim_de_jogo db "                                    ", CR, LF
-                      db "    _____ _  _        ____  _____   ", CR, LF
-                      db "   /    // \/ \__/|  /  _ \/  __/   ", CR, LF
-                      db "   |  __\| || |\/||  | | \||  \     ", CR, LF
-                      db "   | |   | || |  ||  | |_/||  /_    ", CR, LF
-                      db "   \_/   \_/\_/  \|  \____/\____\   ", CR, LF
-                      db "                                    ", CR, LF
-                      db "       _  ____  _____ ____          ", CR, LF
-                      db "      / |/  _ \/  __//  _ \         ", CR, LF
-                      db "      | || / \|| |  _| / \|         ", CR, LF
-                      db "   /\_| || \_/|| |_//| \_/|         ", CR, LF
-                      db "   \____/\____/\____\\____/         ", CR, LF
-                      db "                                    $", CR, LF
+ascii_vencedor  db "                                       ", CR, LF
+                db "  ____   ____                          ", CR, LF
+                db "  \   \ /   /____   ____   ____  ____  ", CR, LF
+                db "   \   Y   // __ \ /    \_/ ___\/ __ \ ", CR, LF
+                db "    \     /\  ___/|   |  \  \__\  ___/ ", CR, LF
+                db "     \___/  \___  >___|  /\___  >___   ", CR, LF
+                db "                ___                    ", CR, LF
+                db "              __| _/___________        ", CR, LF
+                db "             / __ |/  _ \_  __ \       ", CR, LF
+                db "            / /_/ (  <_> )  | \/       ", CR, LF
+                db "            \____ |\____/|__|          $", CR, LF
+
+
+
+
+
+ascii_game_over   db "                                      ", CR, LF
+                  db "      ________                        ", CR, LF
+                  db "     /  _____/_____    _____   ____   ", CR, LF
+                  db "    /   \  ___\__  \  /     \_/ __ \  ", CR, LF
+                  db "    \    \_\  \/ __ \|  Y Y  \  ___/  ", CR, LF
+                  db "    _\______  (____  /__|_|  /\___  > ", CR, LF
+                  db "    \_____  \/__  _\/______\/___  \/  ", CR, LF
+                  db "     /   |   \  \/ // __ \_  __ \     ", CR, LF
+                  db "    /    |    \   /\  ___/|  | \/     ", CR, LF
+                  db "    \_______  /\_/  \___  >__|        ", CR, LF
+                  db "            \/          \/            $", CR, LF
 
                 
 ;-------------------------------------------------------------------------------------------
@@ -627,9 +641,9 @@ endp
 LIMPAR_BUFFER proc
     PUSH AX
     
-    mov ah, 0Ch       ; Função para limpar buffer do teclado
-    mov al, 00h       ; Sub-função 00h: Ignorar entrada
-    int 21h           ; Chama a interrupção do DOS
+    mov ah, 0Ch       ; Fun????o para limpar buffer do teclado
+    mov al, 00h       ; Sub-fun????o 00h: Ignorar entrada
+    int 21h           ; Chama a interrup????o do DOS
     
     POP AX
     ret               ; Retorna ao programa chamador
@@ -677,7 +691,7 @@ PODE_MOVIMENTAR:
     PUSH CX
     PUSH DX
     
-    MOV AH, 86h       ; Função de espera do BIOS
+    MOV AH, 86h       ; Fun????o de espera do BIOS
     MOV CX, parte_alta_intervalo_movimentacao
     MOV DX, parte_baixa_intervalo_movimentacao
     int 15h           
@@ -1062,14 +1076,17 @@ CHECK_COLISAO_NAVE_VIVA proc
     JMP fim_check_colisao_nave_viva
     
 colisao_nave_viva:
-    ; CMP [naves_aliadas_vivas], 0
-    ; JE FIM_FASE
-    ; CHAMA O FIM DA FASE POIS TODAS AS NAVES FORAM DESTRU?DAS.
-    
+    CMP [naves_aliadas_vivas], 0
+    JNE fim_colisao_nave_viva
+
+    mov BL, 0
+    call FIM_JOGO
+
+fim_colisao_nave_viva:
     mov SI, offset array_naves_aliadas 
     mov CX, 8                        
 iterar_aliadas:
-    cmp [SI], 0                        
+    cmp word ptr [SI], 0                        
     je continuar_loop
     
     push DI
@@ -1241,7 +1258,7 @@ MOVE_NAVE_CIMA proc
     mov di, [posicao_nave]        
     call APAGAR_ELEMENTO            
     
-    MOV AX, [velocidade_movimento_aliada]
+    MOV AX, velocidade_movimento_aliada
     MOV BX, 320
     MUL BX
     
@@ -1281,7 +1298,7 @@ MOVE_NAVE_BAIXO proc
     mov di, [posicao_nave] 
     call APAGAR_ELEMENTO
     
-    MOV AX, [velocidade_movimento_aliada]
+    MOV AX, velocidade_movimento_aliada
     MOV BX, 320
     MUL BX
     
@@ -1528,17 +1545,14 @@ LOOP_DE_FASES:
     
     call FLUXO_JOGO
     
-    cmp jogando, 0
-    jz FIM_JOGO
-    
     call PROGRESSAO
     CALL PONTUACAO_FIM_FASE
     
     loop LOOP_DE_FASES
     
-FIM_JOGO:
-    call TELA_FINAL_JOGO
-
+    mov BL, 1
+    call FIM_JOGO
+    
     pop CX
     pop DX
     pop BX
@@ -1649,35 +1663,6 @@ done_fill:
     ret
 endp
 
-TELA_FINAL_JOGO proc
-    push BX
-    push DX
-    push BP
-    push CX
-    
-    call LIMPAR_TELA
-    
-    ;Escreve a logo de inicio
-    mov BL, 2 ; cor VERDE
-    mov DH, 5 ; linha
-    mov DL, 2 ; coluna
-    mov BP, offset ascii_fim_de_jogo
-    call ESC_STRING
-    
-    ; espera um determinado tempo
-    mov CX, offset bit_alto_DelayTela
-    mov DX, offset bit_baixo_DelayTela
-    call DELAY
-    
-    call LIMPAR_TELA
-    
-    pop CX
-    pop BP
-    pop DX
-    pop BX
-    ret
-endp
-
 RESETA_VARIAVEIS_JOGO proc
     push AX
     push CX
@@ -1700,6 +1685,59 @@ LOOP_RESETA_ARRAY_NAVES:
     pop SI
     pop CX
     pop AX
+    ret
+endp
+
+;RECEBE em BL o tipo do final do jogo
+; 0 = perdeu, 1 = ganhou
+FIM_JOGO proc
+    push BX
+    push DX
+    push BP
+    push CX
+    
+    call LIMPAR_TELA
+    
+    mov DH, 5 ; linha
+    mov DL, 0 ; coluna
+    
+    cmp BL, 0
+    jnz VENCEU_STRING 
+    
+    mov BL, 0ch ; cor VERMELHA
+    mov BP, offset ascii_game_over
+    call ESC_STRING
+    
+    jmp FIM_FINAL_JOGO
+VENCEU_STRING:
+    mov BL, 2 ; cor VERDE
+    mov BP, offset ascii_vencedor
+    call ESC_STRING
+    
+    mov BL, 0FH
+    add DH, 15    ; linha
+    add DL, 15
+    mov BP, offset string_score
+    call ESC_STRING
+    
+    add DL, 6    ; coluna
+    mov BP, offset score
+    call ESC_STRING
+    
+FIM_FINAL_JOGO:
+    mov CX, offset bit_alto_DelayTela
+    mov DX, offset bit_baixo_DelayTela
+    call DELAY
+    
+    call LIMPAR_TELA
+    
+    mov ah, 4ch
+    int 21h
+    
+    pop CX
+    pop BP
+    pop DX
+    pop BX
     ret
 endp
 
