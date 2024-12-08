@@ -13,6 +13,10 @@
     Fator_de_progressao_fase                 equ 5
     Qtd_fases                                equ 3
     Tempo_das_fases                          equ 30
+    velocidade_movimento_aliada              equ 1
+    velocidade_movimento_inimigas            equ 2
+    parte_alta_intervalo_movimentacao        equ 0h    ; Em Microsegundos
+    parte_baixa_intervalo_movimentacao       equ 0C350h
     
     progressao_pontuacao_naves_fugitivas     equ 10
     progressao_pontuacao_nave_viva           equ 1000
@@ -187,8 +191,10 @@ endp
 ;DL = 0 se hor?rio padr?o e 1 se DST (Daylight Saving Time)
 ;CF = 0 = rel?gio funcionando e 1 = rel?gio parado
 LER_RTC proc
+    PUSH AX
     mov ah, 02h         
-    int 1Ah            
+    int 1Ah
+    POP AX
     ret
 endp
 
@@ -618,6 +624,17 @@ DESENHA_NAVE_INIMIGA proc
     ret
 endp
 
+LIMPAR_BUFFER proc
+    PUSH AX
+    
+    mov ah, 0Ch       ; Função para limpar buffer do teclado
+    mov al, 00h       ; Sub-função 00h: Ignorar entrada
+    int 21h           ; Chama a interrupção do DOS
+    
+    POP AX
+    ret               ; Retorna ao programa chamador
+endp
+
 FLUXO_JOGO proc
     push AX
     push DX
@@ -651,10 +668,29 @@ LOOP_FASE:
 ; Antes de continuar o loop, validaremos 1 segundo j? se passou.
 CONTINUA_LOOP_FASE:
     call LER_RTC
-    
     cmp dh, [last_rtc_timer]
     JNE ATUALIZA_TEMPO  
-    jmp LOOP_FASE
+    JMP PODE_MOVIMENTAR
+    
+PODE_MOVIMENTAR:
+    PUSH AX
+    PUSH CX
+    PUSH DX
+    
+    MOV AH, 86h       ; Função de espera do BIOS
+    MOV CX, parte_alta_intervalo_movimentacao
+    MOV DX, parte_baixa_intervalo_movimentacao
+    int 15h           
+
+    call MOVIMENTAR_NAVES_INIMIGAS
+    call CRIA_NAVE_INIMIGA
+    
+    ;CALL LIMPAR_BUFFER
+    
+    POP DX
+    POP CX
+    POP AX
+    JMP LOOP_FASE
 
 ATUALIZA_TEMPO:
     mov AX, [timer_do_jogo]
@@ -663,13 +699,10 @@ ATUALIZA_TEMPO:
     cmp AX, 0
     jz SAIR_FLUXO_JOGO
     
-    call MOVIMENTAR_NAVES_INIMIGAS
-    call CRIA_NAVE_INIMIGA
-    
     call MUDA_TIMER
     call SALVAR_TEMPO_ATUAL
     MOV [timer_do_jogo], AX
-    jmp LOOP_FASE
+    JMP PODE_MOVIMENTAR
     
 APERTOU_BAIXO:
     CALL MOVE_NAVE_BAIXO
@@ -1031,7 +1064,7 @@ CHECK_COLISAO_NAVE_VIVA proc
 colisao_nave_viva:
     ; CMP [naves_aliadas_vivas], 0
     ; JE FIM_FASE
-    ; CHAMA O FIM DA FASE POIS TODAS AS NAVES FORAM DESTRUÍDAS.
+    ; CHAMA O FIM DA FASE POIS TODAS AS NAVES FORAM DESTRU?DAS.
     
     mov SI, offset array_naves_aliadas 
     mov CX, 8                        
@@ -1047,7 +1080,7 @@ iterar_aliadas:
     MOV word ptr [SI], 0  
     dec [naves_aliadas_vivas]
     
-    ; Força o ZF para retornar.
+    ; For?a o ZF para retornar.
     XOR CX, CX
     CMP CX, 0
     jmp fim_check_colisao_nave_viva
@@ -1137,7 +1170,7 @@ MOVE_NAVE_ESQUERDA proc
     call ENDERECO_LINEAR_PARA_CARTESIANO
     MOV CX, DX 
     
-    sub di, 10
+    sub di, velocidade_movimento_inimigas
     
     MOV AX, DI
     call ENDERECO_LINEAR_PARA_CARTESIANO
@@ -1182,7 +1215,7 @@ MOVE_NAVE_DIREITA proc
     call APAGAR_ELEMENTO
     
     mov di, [posicao_nave]
-    add di, 1                   ; Move 1 p?xel para a direita.
+    add di, velocidade_movimento_inimigas
     mov [posicao_nave], di
     MOV SI, offset nave
     mov BX, 9
@@ -1208,9 +1241,14 @@ MOVE_NAVE_CIMA proc
     mov di, [posicao_nave]        
     call APAGAR_ELEMENTO            
     
-    mov di, [posicao_nave]
-    sub di, 1600                   ; Move 5 linhas para cima (5 * 320)
-    cmp di, limite_superior        
+    MOV AX, [velocidade_movimento_aliada]
+    MOV BX, 320
+    MUL BX
+    
+    MOV DI, [posicao_nave]
+    SUB DI, AX 
+    
+    CMP DI, limite_superior        
     jbe  ajusta_limite_superior 
     jmp continua_move_nave_cima
 
@@ -1243,8 +1281,13 @@ MOVE_NAVE_BAIXO proc
     mov di, [posicao_nave] 
     call APAGAR_ELEMENTO
     
-    mov di, [posicao_nave]
-    add di, 1600                   ; Move 5 linhas para baixo (5 * 320)
+    MOV AX, [velocidade_movimento_aliada]
+    MOV BX, 320
+    MUL BX
+    
+    MOV DI, [posicao_nave]
+    ADD DI, AX
+    
     cmp di, limite_inferior       
     jae  ajusta_limite_inferior 
     jmp continua_move_nave_baixo
