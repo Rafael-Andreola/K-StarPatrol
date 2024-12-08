@@ -486,35 +486,36 @@ CRIAR_TERRENO_LOOP:
 endp
 
 ;RECEBE em DI o endereco de memoria que a nave quer ser plotada
-;RETORNA BL = 1 quando tem algo, BL = 0 quando n?o tem
+;RETORNA ZF = 1 quando tem algo, BL = 0 quando n?o tem
 VERIFICA_SPAWN_NAVE_INIMIGA proc
     push DI
     push DX
     push AX
     push CX
+    push SI
     
     XOR AX, AX
-    mov BL, 1
+    mov DL, 1
     
-    MOV DL, 9
-LOOP_REINICIA_LINHA:
-    mov CX, 15
-LOOP_VERIFICA_SPAWN_LINHA:
-    mov AX, [DI]
-    cmp AX, 0h
-    jnz RET_VERIFICA_SPAWN_NAVE_INIMIGA
+    mov CX, limite_array_naves
+    mov SI, [array_naves_inimigas]
     
-    inc DI
-    loop LOOP_VERIFICA_SPAWN_LINHA
-    
-    add DI, 305
-    
-    dec DL
-    cmp DL, 0 
-    jnz LOOP_REINICIA_LINHA
-    
-    dec BL
+    mov BX, DI
+LOOP_VERIFICA_SPAWN:
+    mov AX, [SI]
+
+    CALL VERIFICA_COLISAO_SPRITE
+    je set_VERIFICA_SPAWN
+
+    add SI, 2
+    loop LOOP_VERIFICA_SPAWN
+    jmp RET_VERIFICA_SPAWN_NAVE_INIMIGA
+set_VERIFICA_SPAWN:
+    xor DL,DL
 RET_VERIFICA_SPAWN_NAVE_INIMIGA:
+    cmp DL, 0
+    
+    pop SI
     pop CX
     pop AX
     pop DX
@@ -537,8 +538,7 @@ LOOP_GERA_ENDERECO_ALEATORIO:
     call GERA_ENDERECO_ALEATORIO
     call VERIFICA_SPAWN_NAVE_INIMIGA
     
-    cmp BL, 0
-    jnz SAIR_CRIA_NAVE
+    je SAIR_CRIA_NAVE
     
     call GET_ARRAY_NAVES_INIMIGAS
     
@@ -1654,6 +1654,7 @@ fill_zeros:
     loop fill_zeros
 
 done_fill:
+    call ATUALIZA_SCORE
     pop SI
     pop DI
     pop dx           ; Restaurar registradores
