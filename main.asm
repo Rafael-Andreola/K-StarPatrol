@@ -1014,7 +1014,58 @@ ENDERECO_LINEAR_PARA_CARTESIANO PROC
     ret
 endp
 
-; DI: Endere?o linear da nave inimiga
+; DI: Endereco linear da nave inimiga
+; ZF Se houver colisao
+CHECK_COLISAO_NAVE_VIVA proc
+    PUSH AX
+    PUSH DX
+    PUSH BX
+    PUSH SI
+    
+    MOV BX, DI
+    MOV AX, [posicao_nave]
+    CALL VERIFICA_COLISAO_SPRITE
+    JE colisao_nave_viva
+    JMP fim_check_colisao_nave_viva
+    
+colisao_nave_viva:
+    ;MOV CX, [naves_aliadas_vivas]
+    ;DEC CX
+    ;cmp CX, 0
+    ; CHAMA O FIM DA FASE POIS TODAS AS NAVES FORAM DESTRUÍDAS.
+    
+    mov SI, offset array_naves_aliadas 
+    mov CX, 8                        
+iterar_aliadas:
+    cmp [SI], 0                        
+    je continuar_loop
+    
+    push DI
+    MOV DI, [SI]
+    call APAGAR_ELEMENTO
+    POP DI
+    
+    MOV word ptr [SI], 0  
+    dec [naves_aliadas_vivas]
+    
+    ; Força o ZF para retornar.
+    XOR CX, CX
+    CMP CX, 0
+    jmp fim_check_colisao_nave_viva
+    
+continuar_loop:
+    add SI, 2                        
+    loop iterar_aliadas          
+    
+fim_check_colisao_nave_viva:
+    POP SI
+    POP BX
+    POP DX
+    POP AX
+    ret
+endp
+
+; DI: Endereco linear da nave inimiga
 ; Retorna:
 ; ZF Se houver colis?es
 CHECK_COLISAO_NAVES PROC
@@ -1025,7 +1076,11 @@ CHECK_COLISAO_NAVES PROC
     PUSH CX
     PUSH DX
     
+    CALL CHECK_COLISAO_NAVE_VIVA
+    JE colisao_encontrada_nave_viva
+    
     MOV BX, DI
+    
     mov SI, offset array_naves_aliadas ; SI aponta para o in?cio do array
     mov CX, 8                        ; N?mero de naves no array    
     XOR DX, DX                       ; Flag de colis?o
@@ -1038,6 +1093,10 @@ check_loop:
     CALL VERIFICA_COLISAO_SPRITE
     JE colisao_encontrada             ; ZF n?o est? ativo, n?o h? colis?es.
     JMP proximo
+
+colisao_encontrada_nave_viva:
+    MOV DX, 1 
+    JMP fim
     
 colisao_encontrada:
     MOV DX, 1 
@@ -1077,7 +1136,7 @@ MOVE_NAVE_ESQUERDA proc
     
     MOV AX, DI
     call ENDERECO_LINEAR_PARA_CARTESIANO
-    MOV CX, DX ; Salva a coluna
+    MOV CX, DX 
     
     sub di, 10
     
