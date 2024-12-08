@@ -590,7 +590,6 @@ ITERAR_NAVES:
     jnz PROXIMA_ITERACAO
     
     dec [naves_inimigas_na_fase]
-    
 
 PROXIMA_ITERACAO:
     ADD SI, 2
@@ -909,7 +908,7 @@ endp
 ; Verifica se o sprite 1 colide com o sprite 2
 ; AX = coordenada linear do sprite 1
 ; BX = coordenada linear do sprite 2
-; ZF ativo = houve colisão 
+; ZF ativo = houve colis?o 
 VERIFICA_COLISAO_SPRITE proc
     PUSH BX
     push CX
@@ -955,12 +954,12 @@ VERIFICA_COLISAO_SPRITE proc
     add DX, 15
 
     cmp AX, DX
-    jg __NAO_COLIDE ; RectA.Y1 > RectB.Y2? NÃO há colisão.
+    jg __NAO_COLIDE ; RectA.Y1 > RectB.Y2? N?O h? colis?o.
 
     cmp CX, BX
-    jl __NAO_COLIDE ; RectA.Y2 < RectB.Y1? NÃO há colisão.
+    jl __NAO_COLIDE ; RectA.Y2 < RectB.Y1? N?O h? colis?o.
 
-    ; Verifica colisão horizontal
+    ; Verifica colis?o horizontal
     pop AX ;aX1
     pop BX ;bX1
 
@@ -973,10 +972,10 @@ VERIFICA_COLISAO_SPRITE proc
     add DX, 9 ; bX2
 
     cmp AX, DX
-    jg __NAO_COLIDE ; RectA.X1 > RectB.X2? NÃO há colisão.
+    jg __NAO_COLIDE ; RectA.X1 > RectB.X2? N?O h? colis?o.
 
     cmp CX, BX
-    jl __NAO_COLIDE ; RectA.X2 < RectB.X1? NÃO há colisão.
+    jl __NAO_COLIDE ; RectA.X2 < RectB.X1? N?O h? colis?o.
     ; AX > DX && CX < BX
 
     mov CX, 1
@@ -999,7 +998,7 @@ VERIFICA_COLISAO_SPRITE proc
     ret
 endp
 
-; AX: Endereço linear
+; AX: Endere?o linear
 ; Retorno:
 ; AX = Linha (Y)
 ; DX = Coluna (X)
@@ -1014,9 +1013,9 @@ ENDERECO_LINEAR_PARA_CARTESIANO PROC
     ret
 endp
 
-; DI: Endereço linear da nave inimiga
+; DI: Endere?o linear da nave inimiga
 ; Retorna:
-; ZF Se houver colisões
+; ZF Se houver colis?es
 CHECK_COLISAO_NAVES PROC
     PUSH AX
     PUSH BX
@@ -1026,17 +1025,17 @@ CHECK_COLISAO_NAVES PROC
     PUSH DX
     
     MOV BX, DI
-    mov SI, offset array_naves_aliadas ; SI aponta para o início do array
-    mov CX, 8                        ; Número de naves no array    
-    XOR DX, DX                       ; Flag de colisão
+    mov SI, offset array_naves_aliadas ; SI aponta para o in?cio do array
+    mov CX, 8                        ; N?mero de naves no array    
+    XOR DX, DX                       ; Flag de colis?o
 
 check_loop:
-    mov AX, [SI]                     ; AX = Endereço linear da nave aliada
-    cmp AX, 0                        ; Verificar se o endereço é válido
-    je proximo                       ; Se for 0, vá para a próxima nave
+    mov AX, [SI]                     ; AX = Endere?o linear da nave aliada
+    cmp AX, 0                        ; Verificar se o endere?o ? v?lido
+    je proximo                       ; Se for 0, v? para a pr?xima nave
    
     CALL VERIFICA_COLISAO_SPRITE
-    JE colisao_encontrada             ; ZF não está ativo, não há colisões.
+    JE colisao_encontrada             ; ZF n?o est? ativo, n?o h? colis?es.
     JMP proximo
     
 colisao_encontrada:
@@ -1044,13 +1043,13 @@ colisao_encontrada:
     ; APAGA A NAVE ALIADA.
     MOV DI, [SI]
     call APAGAR_ELEMENTO
-    ; Zera o endereço da nave aliada que foi apagada
+    ; Zera o endere?o da nave aliada que foi apagada
     MOV word ptr [SI], 0  
     dec [naves_aliadas_vivas]
     jmp proximo                        
 
 proximo:
-    add si, 2                        ; Próxima nave no array (2 bytes por endereço)
+    add si, 2                        ; Pr?xima nave no array (2 bytes por endere?o)
     loop check_loop                  ; Repetir para todas as naves
     
 fim:
@@ -1075,11 +1074,13 @@ MOVE_NAVE_ESQUERDA proc
     
     call APAGAR_ELEMENTO
     
+    MOV AX, DI
     call ENDERECO_LINEAR_PARA_CARTESIANO
     MOV CX, DX ; Salva a coluna
     
     sub di, 10
     
+    MOV AX, DI
     call ENDERECO_LINEAR_PARA_CARTESIANO
     CMP DX, CX 
     JG zera_posicao_nave
