@@ -12,7 +12,7 @@
     limite_array_naves       equ 20
     Fator_de_progressao_fase equ 5
     Qtd_fases                equ 3
-    Tempo_das_fases          equ 60
+    Tempo_das_fases          equ 30
     Ponto_por_nave_viva      equ 100
     progressao_pontuacao_naves_fugitivas     equ 10
     
@@ -1468,7 +1468,7 @@ PONTUACAO_FIM_FASE proc
     MOV BX, [SI]
     MUL BX
     
-    ADD AX, DX
+    SUB AX, DX
     
     mov SI, offset score_num
     add AX, [SI]
@@ -1507,6 +1507,11 @@ MUDA_SCORE proc
     push DI
     push SI
     
+    cmp AX, 0
+    JNL continua_muda_score
+    MOV AX, 0
+    
+continua_muda_score:
     mov di, offset score_num
     mov [di], AX
 
@@ -1583,9 +1588,9 @@ RESETA_VARIAVEIS_JOGO proc
     
     mov SI, offset array_naves_inimigas
     mov CX, limite_array_naves
-    mov AL, 0
+    mov AX, 0
 LOOP_RESETA_ARRAY_NAVES:
-    mov [SI], AL
+    mov [SI], AX
     add SI, 2
     
     loop LOOP_RESETA_ARRAY_NAVES
