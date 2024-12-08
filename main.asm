@@ -14,6 +14,7 @@
     Qtd_fases                equ 3
     Tempo_das_fases          equ 60
     Ponto_por_nave_viva      equ 100
+    progressao_pontuacao_naves_fugitivas     equ 10
     
     memoria_video      equ 0A000h
     
@@ -46,7 +47,8 @@
     naves_inimigas_na_fase db 0
     limite_naves_inimigas db 10
     score_num dw 0
-    
+    pontuacao_base_fugitivas dw 10
+    quantidade_naves_fugitivas dw 0
     array_cores_naves db 09h, 0Ah, 0Ch, 0Dh, 0Eh, 07h, 05h, 04h
     array_naves_aliadas dw 8 dup(0)
     naves_aliadas_vivas db 8
@@ -1083,11 +1085,16 @@ MOVE_NAVE_ESQUERDA proc
     MOV AX, DI
     call ENDERECO_LINEAR_PARA_CARTESIANO
     CMP DX, CX 
-    JG zera_posicao_nave
+    JG nave_fugiu
     
     CALL CHECK_COLISAO_NAVES
     jz zera_posicao_nave
-
+    jmp continuar_move_nave_esquerda
+    
+nave_fugiu:
+    inc [quantidade_naves_fugitivas]
+    jmp zera_posicao_nave
+    
 continuar_move_nave_esquerda:
     MOV SI, offset nave_inimiga
     mov BL, 09H                     
@@ -1441,29 +1448,35 @@ endp
 
 PONTUACAO_FIM_FASE proc
     push SI
-    push CX
     push AX
+    PUSH BX
+    PUSH DX
     
-    mov SI, offset array_naves_aliadas
-    xor AX, AX
+    mov SI, offset Ponto_por_nave_viva
+    mov AX, [SI]
     
-    mov CX, 8
-LOOP_SOMA_ARRAY_NAVES_VIVAS:
-    cmp word ptr [SI], 0
-    jz CONTROLA_LOOP_SOMA_ARRAY_NAVES_VIVAS     
+    mov SI, offset naves_aliadas_vivas
+    MOV BX, [SI]
+    MUL BX
     
-    add AX, Ponto_por_nave_viva
-CONTROLA_LOOP_SOMA_ARRAY_NAVES_VIVAS:
-    add SI, 2
-    loop LOOP_SOMA_ARRAY_NAVES_VIVAS
+    MOV DX, AX 
+    
+    mov SI, offset pontuacao_base_fugitivas
+    MOV AX, [SI]
+    
+    mov SI, offset quantidade_naves_fugitivas
+    MOV BX, [SI]
+    MUL BX
+    
+    ADD AX, DX
     
     mov SI, offset score_num
     add AX, [SI]
-    
     call MUDA_SCORE
-    call ATUALIZA_SCORE
+    
+    POP DX
+    POP BX
     pop AX
-    pop CX
     pop SI
     ret
 endp
@@ -1566,6 +1579,7 @@ RESETA_VARIAVEIS_JOGO proc
     push SI
     
     mov [timer_do_jogo], Tempo_das_fases
+    mov [quantidade_naves_fugitivas], 0
     
     mov SI, offset array_naves_inimigas
     mov CX, limite_array_naves
@@ -1590,6 +1604,10 @@ PROGRESSAO proc
     
     mov AX, Fator_de_progressao_fase
     mov SI, offset limite_naves_inimigas
+    add [SI], AX
+    
+    MOV AX, progressao_pontuacao_naves_fugitivas
+    MOV SI, offset pontuacao_base_fugitivas
     add [SI], AX
     
     pop AX
@@ -1738,7 +1756,6 @@ INICIA_VIDEO proc
 endp
     
 INICIO:   
-    ; Configura??o do DS
     mov ax, @data
     mov ds, ax
     mov es, ax
