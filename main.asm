@@ -4,17 +4,18 @@
 
 .data 
 ;Constantes
-    CR                       equ 13
-    LF                       equ 10
-    tecla_cima               equ 72
-    tecla_baixo              equ 80
-    tecla_espaco             equ 32
-    limite_array_naves       equ 20
-    Fator_de_progressao_fase equ 5
-    Qtd_fases                equ 3
-    Tempo_das_fases          equ 30
-    Ponto_por_nave_viva      equ 100
+    CR                                       equ 13
+    LF                                       equ 10
+    tecla_cima                               equ 72
+    tecla_baixo                              equ 80
+    tecla_espaco                             equ 32
+    limite_array_naves                       equ 20
+    Fator_de_progressao_fase                 equ 5
+    Qtd_fases                                equ 3
+    Tempo_das_fases                          equ 30
+    
     progressao_pontuacao_naves_fugitivas     equ 10
+    progressao_pontuacao_nave_viva           equ 1000
     
     memoria_video      equ 0A000h
     
@@ -25,7 +26,7 @@
     bit_alto_DelayTela equ 001Eh
     bit_baixo_DelayTela equ 8480h
 
-;CONSTANTES DE TEMPO   
+;CONSTANTES DE TEMPO 
     posicao_nave       dw       ?
 
     limite_inferior             equ 51220   ; 320 * (200 - 9) + 20 (200 - altura do desenho (9) - altura do terreno (20) - 11 (espa?o entre a nave vermelha e o terreno)) + coluna
@@ -54,6 +55,7 @@
     naves_aliadas_vivas db 8
     array_naves_inimigas dw [limite_array_naves] dup(0)
     array_cores_fases db 2, 3, 4
+    ponto_por_nave_viva dw 1000
 ;-------------------------------------------------------------------------------------------        
     ;Sprites
     logo_inicio db "       __ __    ______           ", CR, LF
@@ -275,9 +277,6 @@ MUDA_TIMER proc
     
     call POS_CURSOR
     call ESC_UINT16
-    
-    ;mov SI, offset timer
-    ;mov SI, AX
     
     pop DX
     pop CX
@@ -1452,7 +1451,7 @@ PONTUACAO_FIM_FASE proc
     PUSH BX
     PUSH DX
     
-    mov SI, offset Ponto_por_nave_viva
+    mov SI, offset ponto_por_nave_viva
     mov AX, [SI]
     
     mov SI, offset naves_aliadas_vivas
@@ -1613,6 +1612,10 @@ PROGRESSAO proc
     
     MOV AX, progressao_pontuacao_naves_fugitivas
     MOV SI, offset pontuacao_base_fugitivas
+    add [SI], AX
+    
+    MOV AX, progressao_pontuacao_nave_viva
+    MOV SI, offset ponto_por_nave_viva
     add [SI], AX
     
     pop AX
