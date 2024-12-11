@@ -23,6 +23,8 @@
     
     memoria_video      equ 0A000h
     
+    limite_projeteis equ 20
+    
 ;CONSTANTES DE TEMPO
     bit_alto_DelayMovNaveTelaInicial equ 0000h
     bit_baixo_DelayMovNaveTelaInicial equ 030D4h 
@@ -60,6 +62,10 @@
     array_naves_inimigas dw [limite_array_naves] dup(0)
     array_cores_fases db 2, 3, 4
     ponto_por_nave_viva dw 1000
+    
+    array_projeteis dw [limite_projeteis] dup(0)
+    projeteis_ativos dw 0
+    
 ;-------------------------------------------------------------------------------------------        
     ;Sprites
     logo_inicio db "       __ __    ______           ", CR, LF
@@ -81,11 +87,22 @@
           db   0,   0, 0Fh, 0Fh,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
           db 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,   0,   0,   0,   0
           
+          
+    projetil  db 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,  0,   0,   0,   0
+              db   0,   0,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+              db   0,   0,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+              db   0,   0,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+              db   0,   0, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh
+              db   0,   0,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+              db   0,   0,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+              db   0,   0,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+              db 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh, 0Fh,  0,   0,   0,   0
+          
     nave_inimiga  db  0,  0,  0,  0,  0,  0,  0,  0,  0,   0,  0,  0,  0,  0,  0
                   db  0,  0,  0,  0,  0,  0,  0,  0,  0, 09h,09H,09H,09H,09H,09H
                   db  0,  0,  0,  0,  0,  0,  0,  0,09H, 09H,  0,  0,  0,  0,  0
                   db  0,  0,  0,09H,09H,09H,09H,09H,  0,   0,  0,  0,  0,  0,  0
-                  db 09H,09H,09H,09H,09H,09H,09H,09H,09H, 09H,09H,09H,09H,  0,  0
+                  db 09H,09H,09H,09H,09H,09H,09H,09H,09H, 09H,09H,09H,09H, 0,  0
                   db  0,  0,  0,09H,09H,09H,09H,09H,  0,   0,  0,  0,  0,  0,  0
                   db  0,  0,  0,  0,  0,  0,  0,  0,09H, 09H,  0,  0,  0,  0,  0
                   db  0,  0,  0,  0,  0,  0,  0,  0,  0, 09H,09H,09H,09H,09H,09H
@@ -598,10 +615,9 @@ MOVIMENTAR_NAVES_INIMIGAS proc
     
     XOR CX, CX
     MOV CL, [limite_naves_inimigas]          
-    mov SI, offset array_naves_inimigas 
+    MOV SI, offset array_naves_inimigas 
 ITERAR_NAVES:
     mov DI, [SI]                        
-
     CMP DI, 0 
     JZ PROXIMA_ITERACAO
     
@@ -638,6 +654,268 @@ DESENHA_NAVE_INIMIGA proc
     ret
 endp
 
+VERIFICA_COLISAO_TIRO proc
+    PUSH AX
+    PUSH BX
+    PUSH DX
+    
+    ; Aqui precisaria iterar o v?deo por 15 colunas e 9 linhas a partir do endere?o de DI, e verificar se tem alguma outra cor al?m de preto.
+    
+    jz encontrar_colisao
+    jmp finalizar_verifica_colisao_tiro
+    
+encontrar_colisao:
+    INC DX
+    ; Aqui podemos validar no que ele bateu.
+    jmp finalizar_verifica_colisao_tiro
+    
+finalizar_verifica_colisao_tiro:    
+    CMP DX, 1
+    
+    POP DX
+    POP BX
+    POP AX
+    ret
+endp
+
+; AX ENDERE?O LINEAR DA NAVE
+VERIFICAR_COLISAO_NAVES_PROJETEIS proc
+    PUSH SI
+    PUSH CX
+    PUSH BX
+    PUSH DI
+    PUSH AX
+    PUSH DX
+    
+    XOR DX, DX  ;flag
+
+    MOV CX, limite_projeteis
+    mov SI, offset array_projeteis 
+    
+    cmp byte ptr [projeteis_ativos], 0
+    je fim_verifica_colisao_naves
+    
+loop_verificar_colisao_naves:
+    MOV DI, [SI]
+    CMP DI, 0
+    JZ continuar_loop_verificar_colisao
+    
+    MOV BX, DI    
+    CALL VERIFICA_COLISAO_SPRITE
+    JE colisao_encontrada_naves
+    JMP continuar_loop_verificar_colisao_naves
+    
+continuar_loop_verificar_colisao_naves:
+    ADD SI, 2
+    loop loop_verificar_colisao_naves
+    
+    JMP fim_verifica_colisao_naves
+    
+colisao_encontrada_naves:
+    INC DX
+    CALL APAGAR_ELEMENTO
+    MOV [SI], 0
+    DEC [projeteis_ativos]
+    
+    call NAVE_MORTA
+    
+    JMP fim_verifica_colisao_naves
+    
+fim_verifica_colisao_naves:
+    CMP DX, 1
+    
+    POP DX
+    POP AX
+    POP DI
+    POP BX
+    POP CX
+    POP SI
+    ret
+endp
+
+; AX ENDERE?O DO PROJETIL
+VERIFICAR_COLISAO_PROJETIL_NAVES proc
+    PUSH SI
+    PUSH CX
+    PUSH BX
+    PUSH DI
+    PUSH AX
+    PUSH DX
+    
+    XOR DX, DX  ;flag
+    XOR CX, CX
+    MOV CL, [limite_naves_inimigas]
+    MOV SI, offset array_naves_inimigas  
+    
+loop_verificar_colisao:
+    MOV DI, [SI]
+    CMP DI, 0
+    JZ continuar_loop_verificar_colisao
+    
+    MOV BX, DI    
+    CALL VERIFICA_COLISAO_SPRITE
+    JE colisao_encontrada_projetil
+    JMP continuar_loop_verificar_colisao
+    
+continuar_loop_verificar_colisao:
+    ADD SI, 2
+    loop loop_verificar_colisao
+    JMP fim_verifica_colisao
+    
+colisao_encontrada_projetil:
+    INC DX
+    CALL APAGAR_ELEMENTO
+    MOV [SI], 0
+    DEC [naves_inimigas_na_fase]
+    
+    call NAVE_MORTA
+    
+fim_verifica_colisao:
+    CMP DX, 1
+    
+    POP DX
+    POP AX
+    POP DI
+    POP BX
+    POP CX
+    POP SI
+    ret
+endp
+
+MOVIMENTAR_PROJETEIS proc
+    PUSH SI
+    PUSH DI
+    PUSH CX
+    PUSH AX
+    PUSH DX
+    PUSH BX
+    
+    CMP [projeteis_ativos], 0
+    JZ finalizar_movimentar_projeteis
+    MOV CX, limite_projeteis
+    mov SI, offset array_projeteis 
+iterar_tiros_movimentar:
+    MOV DI, [SI]                        
+    CMP DI, 0 
+    JZ proximo_projetil_movimentar  
+    CALL APAGAR_ELEMENTO
+    
+    MOV AX, DI
+    ;CALL VERIFICAR_COLISAO_PROJETIL_NAVES
+    ;JE remover_projetil
+    
+    CALL ENDERECO_LINEAR_PARA_CARTESIANO    
+    MOV BX, DX                              ; Salva a coluna para verificar se ap?s movimentar ela vai passar da 320.
+    
+    ADD DI, velocidade_movimento_inimigas
+    
+    MOV AX, DI
+    ADD AX, 15                              ;Vai para o final do desenho do projetil
+    CALL ENDERECO_LINEAR_PARA_CARTESIANO
+    CMP BX, DX                              ; Se o final do desenho for menor que o local anterior, ele passou do final
+    JG remover_projetil
+    
+    MOV AX, DI
+    ;CALL VERIFICAR_COLISAO_PROJETIL_NAVES
+    ;JE remover_projetil
+    
+    CALL DESENHAR_PROJETIL
+
+    MOV [SI], DI
+    JMP proximo_projetil_movimentar
+    
+remover_projetil:
+    MOV [SI], 0
+    DEC [projeteis_ativos]
+    
+    ;AUmenta pontos
+    ;call NAVE_MORTA
+    
+proximo_projetil_movimentar:
+    ADD SI, 2
+    LOOP iterar_tiros_movimentar
+    JMP finalizar_movimentar_projeteis
+    
+finalizar_movimentar_projeteis:
+    POP BX
+    POP DX
+    POP AX
+    POP CX
+    POP DI
+    POP SI
+    ret
+endp
+
+NAVE_MORTA proc
+    push AX
+    push SI
+    
+    mov SI, offset score_num
+    mov AX, [SI]
+    add AX, 100 ;100 pontos
+    
+    call MUDA_SCORE
+    call ATUALIZA_SCORE
+    
+    pop SI
+    pop AX
+    ret
+endp
+
+; DI: ENDERE?O
+DESENHAR_PROJETIL proc
+    PUSH SI
+    PUSH BX
+    
+    MOV SI, offset projetil
+    MOV BL, 0Fh     
+    CALL DESENHA_ELEMENTO
+    
+    POP BX
+    POP SI
+    ret
+endp
+
+ATIRAR PROC
+    PUSH AX
+    PUSH BX
+    PUSH SI
+    PUSH DI
+    
+    CMP [projeteis_ativos], limite_projeteis 
+    JZ finalizar_atirar
+    
+    CALL VERIFICA_COLISAO_TIRO
+    JZ finalizar_atirar
+    
+    mov SI, offset array_projeteis 
+iterar_tiros:
+    MOV DI, [SI]                        
+    CMP DI, 0 
+    JNZ proximo_tiro             
+    
+    MOV DI, [posicao_nave]
+    ADD DI, 15              
+    CALL DESENHAR_PROJETIL
+
+    MOV [SI], DI
+    
+    INC [projeteis_ativos]
+    JMP finalizar_atirar
+    
+proximo_tiro:
+    ADD SI, 2
+    LOOP iterar_tiros
+    JMP finalizar_atirar
+    
+finalizar_atirar:
+    POP DI
+    POP SI
+    POP BX
+    POP AX
+    ret
+endp
+
 LIMPAR_BUFFER proc
     PUSH AX
     
@@ -664,6 +942,7 @@ LOOP_FASE:
     ; AH = 01h verifica se tem teclas pressionadas no buffer, essa parte vai capturar qual tecla foi pressionada.
     MOV AH, 00h
     INT 16h
+    CALL LIMPAR_BUFFER
     
     ; Compara se o usuario apertou a arrow down
     CMP AH, tecla_baixo
@@ -674,8 +953,8 @@ LOOP_FASE:
     JZ APERTOU_CIMA
     
     ; Compara se o usuario apertou a barra de espaco
-    ;CMP AL, 32
-    ;JZ APERTOU_ESPACO
+    CMP AL, 32
+    JZ APERTOU_ESPACO
     
     JMP CONTINUA_LOOP_FASE ; REPETE O LOOP.
     
@@ -691,15 +970,15 @@ PODE_MOVIMENTAR:
     PUSH CX
     PUSH DX
     
-    MOV AH, 86h       ; Fun????o de espera do BIOS
+    MOV AH, 86h      
     MOV CX, parte_alta_intervalo_movimentacao
     MOV DX, parte_baixa_intervalo_movimentacao
     int 15h           
-
-    call MOVIMENTAR_NAVES_INIMIGAS
-    call CRIA_NAVE_INIMIGA
     
-    ;CALL LIMPAR_BUFFER
+    call MOVIMENTAR_PROJETEIS
+    call MOVIMENTAR_NAVES_INIMIGAS
+    
+    call CRIA_NAVE_INIMIGA
     
     POP DX
     POP CX
@@ -724,6 +1003,10 @@ APERTOU_BAIXO:
 
 APERTOU_CIMA:
     CALL MOVE_NAVE_CIMA
+    JMP CONTINUA_LOOP_FASE
+    
+APERTOU_ESPACO:
+    CALL ATIRAR
     JMP CONTINUA_LOOP_FASE
 
 SAIR_FLUXO_JOGO:
@@ -1131,8 +1414,8 @@ CHECK_COLISAO_NAVES PROC
     MOV BX, DI
     
     mov SI, offset array_naves_aliadas ; SI aponta para o in?cio do array
-    mov CX, 8                        ; N?mero de naves no array    
-    XOR DX, DX                       ; Flag de colis?o
+    mov CX, 8                          ; N?mero de naves no array    
+    XOR DX, DX                         ; Flag de colis?o
 
 check_loop:
     mov AX, [SI]                     ; AX = Endere?o linear da nave aliada
@@ -1184,10 +1467,16 @@ MOVE_NAVE_ESQUERDA proc
     call APAGAR_ELEMENTO
     
     MOV AX, DI
+    CALL VERIFICAR_COLISAO_NAVES_PROJETEIS
+    JE zera_posicao_nave
+    
     call ENDERECO_LINEAR_PARA_CARTESIANO
     MOV CX, DX 
     
     sub di, velocidade_movimento_inimigas
+    
+    ;CALL VERIFICAR_COLISAO_NAVES_PROJETEIS
+    ;JE zera_posicao_nave
     
     MOV AX, DI
     call ENDERECO_LINEAR_PARA_CARTESIANO
@@ -1237,7 +1526,7 @@ MOVE_NAVE_DIREITA proc
     MOV SI, offset nave
     mov BX, 9
     mov AX, 15
-    mov BL, 0Fh                 ; branco
+    mov BL, 0Fh ; branco
     call DESENHA_ELEMENTO   
 
     pop di
@@ -1508,7 +1797,6 @@ FIM_TELA_INICIAL:
     
     mov ah, 00h
     int 16h
-    ;call LIMPAR_TELA
     ;call FIM_PROGRAMA
     ret
 endp
@@ -1669,6 +1957,7 @@ RESETA_VARIAVEIS_JOGO proc
     push CX
     push SI
     
+    MOV [projeteis_ativos], 0
     mov [timer_do_jogo], Tempo_das_fases
     mov [quantidade_naves_fugitivas], 0
     
@@ -1683,10 +1972,20 @@ LOOP_RESETA_ARRAY_NAVES:
     
     mov [naves_inimigas_na_fase], 0
     
+    mov SI, offset array_projeteis
+    mov CX, limite_projeteis
+    mov AX, 0
+LOOP_RESETA_ARRAY_PROJETEIS:
+    mov [SI], AX
+    add SI, 2
+    
+    loop LOOP_RESETA_ARRAY_PROJETEIS
+     
     pop SI
     pop CX
     pop AX
     ret
+ 
 endp
 
 ;RECEBE em BL o tipo do final do jogo
